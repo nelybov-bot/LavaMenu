@@ -24,6 +24,7 @@ import ru.lava.lavamenu.util.OnlinePlayers;
 import ru.lava.lavamenu.util.PlayerFaces;
 import ru.lava.lavamenu.util.PvpStatus;
 import ru.lava.lavamenu.util.UiFeedback;
+import ru.lava.lavamenu.update.ModUpdateService;
 
 import java.util.List;
 import java.util.Map;
@@ -167,9 +168,11 @@ public final class LavaMenuScreen extends Screen {
     private static int chatStep() { return CHAT_ROW_H + UiTheme.ROW_GAP; }
 
     // SETTINGS: hold mode + hint, then slots block below (без наложения текста)
-    private int settingsModeY() { return innerY() + 10; }
-    private int settingsHintY() { return settingsModeY() + 16; }
-    private int settingsSlotsTop() { return settingsHintY() + 16; }
+    private int settingsModeY() { return innerY() + 8; }
+    private int settingsHintY() { return settingsModeY() + 14; }
+    private int settingsUpdateY() { return settingsHintY() + 12; }
+    private int settingsUpdateBtnY() { return settingsUpdateY() + 11; }
+    private int settingsSlotsTop() { return settingsUpdateBtnY() + UiTheme.ROW_H + 8; }
     private int settingsSlotsListTop() { return settingsSlotsTop() + 12; }
     private int settingsSlotsBottom() { return innerBottom(); }
 
@@ -443,12 +446,27 @@ public final class LavaMenuScreen extends Screen {
 
     private void initSettings() {
         int px = innerX(), w = innerW();
+        ModUpdateService upd = ModUpdateService.get();
+        upd.setUiListener(this::rebuildWidgets);
+
         radialModeToggle = LavaWidgets.toggle(px + w - UiTheme.TOGGLE_W, settingsModeY() + 2,
                 LavaMenuConfig.get().radial.mode() == LavaMenuConfig.RadialMode.HOLD, on -> {
                     LavaMenuConfig.get().radial.setMode(on ? LavaMenuConfig.RadialMode.HOLD : LavaMenuConfig.RadialMode.TOGGLE);
                     LavaMenuConfig.get().save();
                 });
         addRenderableWidget(radialModeToggle);
+
+        int half = (w - UiTheme.ROW_GAP) / 2;
+        int by = settingsUpdateBtnY();
+        boolean canInstall = upd.updateAvailable() || upd.needsRestart();
+        addRenderableWidget(LavaWidgets.styled(px, by, half, UiTheme.ROW_H,
+                Component.translatable("lavamenu.update.check"),
+                LavaWidgets.BtnStyle.SECONDARY,
+                () -> ModUpdateService.get().checkAsync(true)));
+        addRenderableWidget(LavaWidgets.styled(px + half + UiTheme.ROW_GAP, by, half, UiTheme.ROW_H,
+                Component.translatable("lavamenu.update.install"),
+                canInstall && !upd.needsRestart() ? LavaWidgets.BtnStyle.PRIMARY : LavaWidgets.BtnStyle.SECONDARY,
+                () -> ModUpdateService.get().installAsync()));
 
         var radial = LavaMenuConfig.get().radial;
         radial.ensureDefaults();
@@ -774,6 +792,9 @@ public final class LavaMenuScreen extends Screen {
         MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.settings.section_keys"), x, py - 9);
         gfx.text(font, Component.translatable("lavamenu.radial.mode_label"), x, settingsModeY() + 2, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, Component.translatable("lavamenu.radial.controls_hint"), x, settingsHintY(), UiTheme.TEXT_DIM, false);
+        gfx.text(font, ModUpdateService.get().statusLabel(), x, settingsUpdateY(),
+                ModUpdateService.get().updateAvailable() || ModUpdateService.get().needsRestart()
+                        ? UiTheme.WORLD_GREEN : UiTheme.TEXT_DIM, false);
         MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.radial.slots_title"), x, settingsSlotsTop() - 9);
         gfx.text(font, Component.translatable("lavamenu.radial.slots_hint"), x, settingsSlotsTop(), UiTheme.TEXT_DIM, false);
     }

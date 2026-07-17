@@ -13,6 +13,7 @@ import ru.lava.lavamenu.homes.HomesChatListener;
 import ru.lava.lavamenu.homes.HomesData;
 import ru.lava.lavamenu.homes.HomesParser;
 import ru.lava.lavamenu.input.KeyBindings;
+import ru.lava.lavamenu.update.ModUpdateService;
 import ru.lava.lavamenu.util.AnimationHelper;
 import ru.lava.lavamenu.util.FaceCache;
 import ru.lava.lavamenu.util.PvpStatus;
@@ -39,6 +40,7 @@ public final class LavaMenuClient implements ClientModInitializer {
         HomesChatListener.register();
         PmChatListener.register();
         AnimationHelper.register();
+        ModUpdateService.get().cleanupPendingDeletes();
 
         HomesData.get().setChangeListener(() -> {
             Minecraft mc = Minecraft.getInstance();
@@ -112,6 +114,8 @@ public final class LavaMenuClient implements ClientModInitializer {
                 pvpSyncTicks = 0;
                 PvpStatus.syncFromTab();
             }
+
+            ModUpdateService.get().tickHourly();
         });
     }
 }

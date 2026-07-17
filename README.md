@@ -4,7 +4,7 @@
 
 ## Установка
 
-Скопируйте `release/lavamenu-0.1.0.jar` в `.minecraft/mods/`.
+Скопируйте `release/lavamenu-0.1.1.jar` в `.minecraft/mods/`.
 
 - Конфиг: `.minecraft/config/lavamenu.json`
 - Чаты: `.minecraft/config/lavamenu-chats.json`
@@ -21,12 +21,15 @@ export JAVA_HOME="/usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
 ./gradlew build
 ```
 
-Готовый JAR: `source/build/libs/lavamenu-0.1.0.jar`
+Готовый JAR: `source/build/libs/lavamenu-0.1.1.jar`
 
 ## Управление
 
 - **R** — основное меню (Точки / Команды / Друзья / Чаты / Настройки)
 - **G** — быстрое круговое меню
 - Клавиши меняются в Minecraft → Управление; в моде — режим удержания и слоты колеса
+- В **Настройках**: «Проверить» / «Обновить» — обновление с GitHub Releases (после установки: перезапусти игру)
 
 Лицензия: MIT (см. `LICENSE`).
+
+Репозиторий: https://github.com/nelybov-bot/LavaMenu

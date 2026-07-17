@@ -18,9 +18,12 @@ import ru.lava.lavamenu.util.PlayerFaces;
  * Открыть: ЛКМ по тосту или клавиша {@link KeyBindings#OPEN_REPLY} (по умолчанию Y).
  */
 public final class ChatToastService {
-    public static final int TOAST_W = 220;
-    public static final int TOAST_H = 52;
-    public static final int MARGIN = 8;
+    /** Компактный тост — меньше перекрывает ванильный чат справа внизу. */
+    public static final int TOAST_W = 168;
+    public static final int TOAST_H = 36;
+    public static final int MARGIN = 6;
+    /** Отступ от низа экрана (хотбар + чат). */
+    public static final int BOTTOM_PAD = 48;
     private static final long VISIBLE_MS = 12_000L;
 
     private static String nick = "";
@@ -83,7 +86,7 @@ public final class ChatToastService {
     }
 
     public static int toastY(int screenH) {
-        return screenH - TOAST_H - MARGIN - 22;
+        return screenH - TOAST_H - MARGIN - BOTTOM_PAD;
     }
 
     public static boolean hit(double mouseX, double mouseY, int screenW, int screenH) {
@@ -106,7 +109,6 @@ public final class ChatToastService {
             leftWasDown = mc.mouseHandler.isLeftPressed();
             return;
         }
-        // В игре мышь захвачена — клик почти не попадает в HUD; основной способ — клавиша Y
         if (!mc.mouseHandler.isMouseGrabbed()) {
             boolean down = mc.mouseHandler.isLeftPressed();
             boolean edge = down && !leftWasDown;
@@ -138,26 +140,34 @@ public final class ChatToastService {
         gfx.fill(x, y, x + TOAST_W, y + h, UiTheme.PANEL_BG);
         gfx.fill(x, y, x + 2, y + h, UiTheme.ACCENT);
 
-        int face = 20;
-        PlayerFaces.draw(gfx, font, from, x + 6, y + 6, face);
+        int face = 12;
+        PlayerFaces.draw(gfx, font, from, x + 4, y + 4, face);
+        int textX = x + 4 + face + 3;
+        int maxW = TOAST_W - (textX - x) - 4;
+
         String title = from == null ? "" : from;
-        gfx.text(font, Component.literal(title),
-                x + 30, y + 6, UiTheme.TEXT_PRIMARY, false);
+        if (font.width(title) > maxW) {
+            title = font.plainSubstrByWidth(title, Math.max(0, maxW - font.width("…"))) + "…";
+        }
+        gfx.text(font, Component.literal(title), textX, y + 3, UiTheme.TEXT_PRIMARY, false);
 
         String body = preview == null ? "" : preview;
-        int maxW = TOAST_W - 36;
-        if (font.width(body) > maxW) {
-            body = font.plainSubstrByWidth(body, maxW - font.width("…")) + "…";
-        }
-        gfx.text(font, Component.literal(body),
-                x + 30, y + 18, UiTheme.TEXT_MUTED, false);
-
         if (!replyMode) {
             String keyName = KeyBindings.OPEN_REPLY == null
                     ? "Y"
                     : KeyBindings.OPEN_REPLY.getTranslatedKeyMessage().getString();
+            // превью + короткий хинт в одну линию по высоте
+            if (font.width(body) > maxW) {
+                body = font.plainSubstrByWidth(body, Math.max(0, maxW - font.width("…"))) + "…";
+            }
+            gfx.text(font, Component.literal(body), textX, y + 14, UiTheme.TEXT_MUTED, false);
             gfx.text(font, Component.translatable("lavamenu.chats.toast_hint", keyName),
-                    x + 30, y + 34, UiTheme.TEXT_DIM, false);
+                    textX, y + 24, UiTheme.TEXT_DIM, false);
+        } else {
+            if (font.width(body) > maxW) {
+                body = font.plainSubstrByWidth(body, Math.max(0, maxW - font.width("…"))) + "…";
+            }
+            gfx.text(font, Component.literal(body), textX, y + 14, UiTheme.TEXT_MUTED, false);
         }
     }
 }

@@ -8,18 +8,23 @@ import ru.lava.lavamenu.util.UiFeedback;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Передача тетрадки через /msg.
  * Строки: {@code [LMNB]S|from}, {@code [LMNB]E|nick|reason}, {@code [LMNB]D|count}.
+ * <p>
+ * Важно: одно PM может прийти и как CHAT, и как GAME — повторный {@code S|} не должен
+ * сбрасывать уже принятые {@code E|}.
  */
 public final class NotebookShare {
     public static final String MARK = "[LMNB]";
-    private static final int TICKS_BETWEEN = 3;
+    /** Пауза между /msg — сервер часто режет быстрый спам ЛС. */
+    private static final int TICKS_BETWEEN = 8;
     private static final long PENDING_TTL_MS = 180_000L;
     /** Запас под {@code msg <nick> } и лимит команды ~256. */
-    private static final int MAX_PAYLOAD = 200;
+    private static final int MAX_PAYLOAD = 180;
 
     private static final List<NotebookEntry> pending = new ArrayList<>();
     private static String pendingFrom = "";
@@ -44,7 +49,17 @@ public final class NotebookShare {
         int n = 0;
         if (entries != null) {
             for (NotebookEntry e : entries) {
-                out.add(clip(MARK + "E|" + sanitize(e.nick) + "|" + sanitize(e.reason)));
+                if (e == null || e.nick == null || e.nick.isBlank()) continue;
+                String nick = sanitize(e.nick);
+                String reason = sanitize(e.reason);
+                // ужимаем reason, если вместе с ником не влезает
+                String line = MARK + "E|" + nick + "|" + reason;
+                if (line.length() > MAX_PAYLOAD) {
+                    int keep = Math.max(0, MAX_PAYLOAD - (MARK + "E|" + nick + "|").length());
+                    reason = reason.length() <= keep ? reason : reason.substring(0, keep);
+                    line = MARK + "E|" + nick + "|" + reason;
+                }
+                out.add(clip(line));
                 n++;
             }
         }
@@ -78,26 +93,35 @@ public final class NotebookShare {
             sending.set(false);
             return;
         }
-        CommandHelper.sendFromUi("msg " + target + " " + payloads.get(index));
+        String payload = payloads.get(index);
+        // chat-команда: надёжнее для длинного текста на части серверов
+        boolean ok = CommandHelper.sendChatCommand("msg " + target + " " + payload);
+        if (!ok) {
+            sending.set(false);
+            UiFeedback.actionBar(Component.translatable("lavamenu.notebook.share_fail"));
+            return;
+        }
         if (index + 1 >= payloads.size()) {
             sending.set(false);
             UiFeedback.actionBar(Component.translatable("lavamenu.notebook.shown", target));
             return;
         }
-        int[] left = {TICKS_BETWEEN};
-        Runnable wait = new Runnable() {
-            @Override
-            public void run() {
-                if (mc.player == null) {
-                    sending.set(false);
-                    return;
-                }
-                left[0]--;
-                if (left[0] <= 0) sendNext(target, payloads, index + 1);
-                else mc.execute(this);
+        scheduleNext(target, payloads, index + 1, TICKS_BETWEEN);
+    }
+
+    private static void scheduleNext(String target, List<String> payloads, int nextIndex, int ticksLeft) {
+        Minecraft mc = Minecraft.getInstance();
+        if (ticksLeft <= 0) {
+            sendNext(target, payloads, nextIndex);
+            return;
+        }
+        mc.execute(() -> {
+            if (mc.player == null) {
+                sending.set(false);
+                return;
             }
-        };
-        mc.execute(wait);
+            scheduleNext(target, payloads, nextIndex, ticksLeft - 1);
+        });
     }
 
     /** Тик клиента: применить частичный снимок, если D| так и не пришёл. */
@@ -116,12 +140,18 @@ public final class NotebookShare {
 
         String body = text.trim().substring(MARK.length()).trim();
         if (body.startsWith("S|")) {
-            if (pendingStartedMs > 0L) {
-                boolean sameSender = pendingSender.isBlank()
-                        || senderNick == null
-                        || senderNick.isBlank()
-                        || pendingSender.equalsIgnoreCase(senderNick.trim());
-                if (!sameSender) return true; // чужой шаре не сбрасывает текущий
+            boolean sameSender = pendingStartedMs > 0L && (
+                    pendingSender.isBlank()
+                            || senderNick == null
+                            || senderNick.isBlank()
+                            || pendingSender.equalsIgnoreCase(senderNick.trim()));
+            // Повтор того же S| (CHAT+GAME) — не чистим уже принятые E|
+            if (sameSender && pendingStartedMs > 0L) {
+                return true;
+            }
+            // Чужой параллельный шаре — игнор
+            if (pendingStartedMs > 0L && !sameSender) {
+                return true;
             }
             pending.clear();
             pendingFrom = body.length() > 2 ? body.substring(2).trim() : (senderNick == null ? "" : senderNick);
@@ -141,11 +171,15 @@ public final class NotebookShare {
             String nick = sep < 0 ? rest.trim() : rest.substring(0, sep).trim();
             String reason = sep < 0 ? "" : rest.substring(sep + 1).trim();
             if (!nick.isBlank()) {
-                pending.add(new NotebookEntry(nick, reason, System.currentTimeMillis(), pendingFrom));
+                upsertPending(nick, reason);
             }
             return true;
         }
         if (body.startsWith("D|")) {
+            // Повторный D| после commit (CHAT+GAME) — не затирать снимок пустым
+            if (pendingStartedMs == 0L && pending.isEmpty()) {
+                return true;
+            }
             String from = pendingFrom.isBlank() && senderNick != null ? senderNick : pendingFrom;
             int expected = -1;
             try {
@@ -157,6 +191,17 @@ public final class NotebookShare {
             return true;
         }
         return true;
+    }
+
+    private static void upsertPending(String nick, String reason) {
+        String key = nick.toLowerCase(Locale.ROOT);
+        for (NotebookEntry e : pending) {
+            if (e.nick.toLowerCase(Locale.ROOT).equals(key)) {
+                e.reason = reason;
+                return;
+            }
+        }
+        pending.add(new NotebookEntry(nick, reason, System.currentTimeMillis(), pendingFrom));
     }
 
     private static boolean acceptFromSender(String senderNick) {

@@ -181,4 +181,12 @@ public final class AstoriaNotebookStore {
         save();
         notifyChanged();
     }
+
+    /** Зритель убрал показанную тетрадку (вкладка исчезнет). */
+    public synchronized void clearViewerSnapshot() {
+        entries.clear();
+        sharedFrom = "";
+        save();
+        notifyChanged();
+    }
 }

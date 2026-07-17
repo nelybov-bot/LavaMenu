@@ -19,7 +19,7 @@ import ru.lava.lavamenu.util.UiFeedback;
  * Можно сразу открыть полный чат (с переносом черновика).
  */
 public final class ChatToastScreen extends Screen {
-    public static final int PANEL_H = 72;
+    public static final int PANEL_H = 58;
 
     private final String nick;
     private String preview;
@@ -49,14 +49,13 @@ public final class ChatToastScreen extends Screen {
     @Override
     protected void init() {
         panelX = ChatToastService.toastX(width);
-        panelY = height - PANEL_H - ChatToastService.MARGIN - 22;
+        panelY = height - PANEL_H - ChatToastService.MARGIN - ChatToastService.BOTTOM_PAD;
 
-        int pad = 6;
+        int pad = 4;
         int iconW = UiTheme.ICON_BTN;
-        int gap = 4;
+        int gap = 3;
         int fieldX = panelX + pad;
         int fieldY = panelY + PANEL_H - pad - UiTheme.FIELD_H;
-        // поле · открыть чат · отправить
         int fieldW = ChatToastService.TOAST_W - pad * 2 - iconW * 2 - gap * 2;
 
         input = new EditBox(font, fieldX, fieldY, fieldW, UiTheme.FIELD_H,

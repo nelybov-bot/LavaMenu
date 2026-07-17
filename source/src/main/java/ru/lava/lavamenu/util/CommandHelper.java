@@ -19,6 +19,13 @@ public final class CommandHelper {
         return send(commandWithoutSlash, true);
     }
 
+    /**
+     * То же, что {@link #sendFromUi}, явно для цепочек /msg (тетрадка и т.п.).
+     */
+    public static boolean sendChatCommand(String commandWithoutSlash) {
+        return send(commandWithoutSlash, true);
+    }
+
     private static boolean send(String commandWithoutSlash, boolean fromUi) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {

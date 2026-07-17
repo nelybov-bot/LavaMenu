@@ -18,8 +18,8 @@ import ru.lava.lavamenu.ui.UiTheme;
  * Показывается при обнаружении новой версии и повторно раз в час, пока не обновят.
  */
 public final class UpdateToastService {
-    public static final int TOAST_W = 220;
-    public static final int TOAST_H = 58;
+    public static final int TOAST_W = 168;
+    public static final int TOAST_H = 44;
     private static final long VISIBLE_MS = 20_000L;
 
     private static long untilMs = 0L;
@@ -68,9 +68,9 @@ public final class UpdateToastService {
     }
 
     public static int toastY(int screenH) {
-        int y = screenH - TOAST_H - ChatToastService.MARGIN - 22;
+        int y = screenH - TOAST_H - ChatToastService.MARGIN - ChatToastService.BOTTOM_PAD;
         if (ChatToastService.isVisible()) {
-            y -= ChatToastService.TOAST_H + 6;
+            y -= ChatToastService.TOAST_H + 4;
         }
         return y;
     }
@@ -119,14 +119,14 @@ public final class UpdateToastService {
         gfx.fill(x, y, x + TOAST_W, y + TOAST_H, UiTheme.PANEL_BG);
         gfx.fill(x, y, x + 2, y + TOAST_H, UiTheme.WORLD_GREEN);
 
-        int img = 40;
-        RadialCenterIcon.drawAt(gfx, mc, x + 8, y + (TOAST_H - img) / 2, img);
+        int img = 28;
+        RadialCenterIcon.drawAt(gfx, mc, x + 5, y + (TOAST_H - img) / 2, img);
 
-        int tx = x + 8 + img + 8;
+        int tx = x + 5 + img + 5;
         gfx.text(font, Component.translatable("lavamenu.update.toast_title"),
-                tx, y + 8, UiTheme.TEXT_PRIMARY, false);
+                tx, y + 5, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, Component.translatable("lavamenu.update.toast_body"),
-                tx, y + 20, UiTheme.WORLD_GREEN, false);
+                tx, y + 16, UiTheme.WORLD_GREEN, false);
 
         String keyName = KeyBindings.OPEN_REPLY == null
                 ? "Y"
@@ -135,6 +135,6 @@ public final class UpdateToastService {
         if (!version.isBlank()) {
             hint = Component.translatable("lavamenu.update.toast_hint_ver", keyName, version).getString();
         }
-        gfx.text(font, Component.literal(hint), tx, y + 36, UiTheme.TEXT_DIM, false);
+        gfx.text(font, Component.literal(hint), tx, y + 28, UiTheme.TEXT_DIM, false);
     }
 }

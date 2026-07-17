@@ -198,8 +198,8 @@ public final class LavaMenuScreen extends Screen {
     private int notebookShowY() { return notebookAddY() + step(); }
     private int notebookFormBottom() {
         if (NotebookAccess.canEdit()) return notebookShowY() + UiTheme.FIELD_H;
-        // зритель: заголовок + строка «от …»
-        return notebookTitleY() + 24;
+        // зритель: заголовок + кнопка «Убрать»
+        return notebookAddY() + UiTheme.ROW_H;
     }
     private int notebookListTop() { return notebookFormBottom() + 10; }
     private int notebookListBottom() { return innerBottom(); }
@@ -541,6 +541,11 @@ public final class LavaMenuScreen extends Screen {
             addRenderableWidget(LavaWidgets.styled(px + w - showBtnW, notebookShowY(), showBtnW, UiTheme.ROW_H,
                     Component.translatable("lavamenu.notebook.show"),
                     LavaWidgets.BtnStyle.SECONDARY, this::shareNotebook));
+        } else {
+            // Зритель: убрать показанную тетрадку
+            addRenderableWidget(LavaWidgets.styled(px, notebookAddY(), w, UiTheme.ROW_H,
+                    Component.translatable("lavamenu.notebook.dismiss"),
+                    LavaWidgets.BtnStyle.DANGER, this::dismissNotebookView));
         }
 
         List<NotebookEntry> list = AstoriaNotebookStore.get().entries();
@@ -576,6 +581,16 @@ public final class LavaMenuScreen extends Screen {
                                     }))));
             y += notebookStep();
         }
+    }
+
+    private void dismissNotebookView() {
+        Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+                Component.translatable("lavamenu.confirm.title"),
+                Component.translatable("lavamenu.notebook.dismiss_confirm"),
+                () -> {
+                    AstoriaNotebookStore.get().clearViewerSnapshot();
+                    selectTab(Tab.HOMES);
+                }));
     }
 
     private void addNotebookEntry() {

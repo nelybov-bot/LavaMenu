@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Локальная «Тетрадка мести Астории» — {@code config/lavamenu-notebook.json}.
+ * Локальная «Тетрадка Астории» — {@code config/lavamenu-notebook.json}.
  * Редакторы правят у себя; зрителям снимок приходит через /msg ({@link NotebookShare}).
  */
 public final class AstoriaNotebookStore {

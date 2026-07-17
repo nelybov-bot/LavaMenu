@@ -23,16 +23,16 @@ public final class UiTheme {
     public static final int OFFLINE = 0xFF666666;
     public static final int BACKDROP = 0x90000000;
 
-    public static final int PAD = 8;
-    /** Базовая ширина; с вкладкой «Тетрадь» меню чуть шире ({@link #PANEL_WIDTH_NOTEBOOK}). */
-    public static final int PANEL_WIDTH = 360;
-    public static final int PANEL_WIDTH_NOTEBOOK = 404;
-    public static final int PANEL_HEIGHT = 310;
+    public static final int PAD = 7;
+    /** Базовая ширина; с вкладкой «Тетрадь» чуть шире ({@link #PANEL_WIDTH_NOTEBOOK}). */
+    public static final int PANEL_WIDTH = 320;
+    public static final int PANEL_WIDTH_NOTEBOOK = 356;
+    public static final int PANEL_HEIGHT = 268;
 
-    public static final int HEADER_H = 18;
-    public static final int TAB_Y = 20;
-    public static final int TAB_H = 18;
-    public static final int CONTENT_Y = 42;
+    public static final int HEADER_H = 16;
+    public static final int TAB_Y = 17;
+    public static final int TAB_H = 16;
+    public static final int CONTENT_Y = 36;
 
     public static final int ROW_H = 16;
     public static final int ROW_GAP = 3;

@@ -6,7 +6,6 @@ import net.minecraft.network.chat.Component;
 import ru.lava.lavamenu.LavaMenuClient;
 import ru.lava.lavamenu.util.UiFeedback;
 
-import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -17,10 +16,15 @@ import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -32,17 +36,17 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * Проверка и установка обновлений с GitHub Releases ({@code nelybov-bot/LavaMenu}).
- * HTTP через {@link HttpURLConnection} + прокси Minecraft (java.net.http часто даёт «нет соединения»).
+ * Обновления с GitHub Releases.
+ * <p>
+ * Главный путь — тот же {@link HttpClient}, что работал с v0.1.1.
+ * Запасной — {@link HttpURLConnection} без прокси Minecraft (прокси лаунчера часто даёт «нет соединения»).
+ * Если API недоступен — версия из raw {@code gradle.properties} + jar из репо/jsDelivr.
  */
 public final class ModUpdateService {
     public static final String GITHUB_OWNER = "nelybov-bot";
     public static final String GITHUB_REPO = "LavaMenu";
     private static final String API_LATEST =
             "https://api.github.com/repos/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/releases/latest";
-    private static final String WEB_LATEST =
-            "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/releases/latest";
-    /** Версия из репо — когда API/редирект недоступны. */
     private static final String RAW_GRADLE =
             "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
                     + "/main/source/gradle.properties";
@@ -54,13 +58,16 @@ public final class ModUpdateService {
                     + "@main/release/lavamenu-%s.jar";
 
     private static final long CHECK_INTERVAL_MS = 60L * 60L * 1000L;
-    private static final int CONNECT_MS = 12_000;
-    private static final int READ_MS = 45_000;
     private static final Pattern TAG_VERSION = Pattern.compile("(\\d+(?:\\.\\d+){0,3})");
-    private static final Pattern TAG_IN_URL = Pattern.compile("/releases/tag/([^/?#\\s]+)");
     private static final Pattern MOD_VERSION = Pattern.compile("(?m)^\\s*mod\\.version\\s*=\\s*(\\S+)");
 
     private static final ModUpdateService INSTANCE = new ModUpdateService();
+
+    /** Как в первой рабочей версии апдейтера. */
+    private static final HttpClient HTTP = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(12))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
 
     private final AtomicBoolean busy = new AtomicBoolean(false);
     private volatile long lastCheckMs = 0L;
@@ -121,7 +128,7 @@ public final class ModUpdateService {
     }
 
     private static String userAgent() {
-        return "LavaMenu/" + currentVersion() + " (+https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + ")";
+        return "LavaMenu/" + currentVersion();
     }
 
     public static String currentVersion() {
@@ -263,7 +270,7 @@ public final class ModUpdateService {
                 break;
             } catch (Exception e) {
                 last = e;
-                LavaMenuClient.LOGGER.warn("Download failed from {}: {}", tryUrl, e.toString());
+                LavaMenuClient.LOGGER.warn("Download failed {}: {}", tryUrl, e.toString());
                 Files.deleteIfExists(part);
             }
         }
@@ -304,20 +311,50 @@ public final class ModUpdateService {
     private static List<String> downloadCandidates(String primary, String version) {
         List<String> out = new ArrayList<>();
         if (primary != null && !primary.isBlank()) out.add(primary);
+        String tagJar = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
+                + "/releases/download/v" + version + "/lavamenu-" + version + ".jar";
         String raw = String.format(Locale.ROOT, RAW_JAR, version);
         String cdn = String.format(Locale.ROOT, JSDELIVR_JAR, version);
-        if (!out.contains(raw)) out.add(raw);
-        if (!out.contains(cdn)) out.add(cdn);
+        for (String u : List.of(tagJar, raw, cdn)) {
+            if (!out.contains(u)) out.add(u);
+        }
         return out;
     }
 
     private static void downloadTo(String url, Path part) throws Exception {
-        HttpURLConnection conn = open(url, true);
+        try {
+            downloadWithHttpClient(url, part);
+        } catch (Exception first) {
+            LavaMenuClient.LOGGER.warn("HttpClient download failed, trying URLConnection: {}", first.toString());
+            downloadWithUrlConnection(url, part);
+        }
+    }
+
+    private static void downloadWithHttpClient(String url, Path part) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofMinutes(2))
+                .header("User-Agent", userAgent())
+                .header("Accept", "application/octet-stream,*/*")
+                .GET()
+                .build();
+        HttpResponse<InputStream> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofInputStream());
+        if (resp.statusCode() / 100 != 2) {
+            throw new IllegalStateException("скачивание HTTP " + resp.statusCode());
+        }
+        try (InputStream in = resp.body()) {
+            Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static void downloadWithUrlConnection(String url, Path part) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection(Proxy.NO_PROXY);
+        conn.setConnectTimeout(12_000);
+        conn.setReadTimeout(120_000);
+        conn.setInstanceFollowRedirects(true);
+        conn.setRequestProperty("User-Agent", userAgent());
         try {
             int code = conn.getResponseCode();
-            if (code / 100 != 2) {
-                throw new IllegalStateException("скачивание HTTP " + code);
-            }
+            if (code / 100 != 2) throw new IllegalStateException("скачивание HTTP " + code);
             try (InputStream in = conn.getInputStream()) {
                 Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -336,92 +373,105 @@ public final class ModUpdateService {
     }
 
     private ReleaseInfo fetchLatest() throws Exception {
-        List<Exception> errors = new ArrayList<>();
+        Exception apiErr = null;
         try {
-            return fetchLatestApi();
+            return fetchLatestApiHttpClient();
         } catch (Exception e) {
-            errors.add(e);
-            LavaMenuClient.LOGGER.warn("Update API failed: {}", e.toString());
+            apiErr = e;
+            LavaMenuClient.LOGGER.warn("API via HttpClient failed: {}", e.toString());
         }
         try {
-            return fetchLatestWebRedirect();
+            return fetchLatestApiUrlConnection();
         } catch (Exception e) {
-            errors.add(e);
-            LavaMenuClient.LOGGER.warn("Update web redirect failed: {}", e.toString());
+            LavaMenuClient.LOGGER.warn("API via URLConnection failed: {}", e.toString());
+            if (apiErr != null) e.addSuppressed(apiErr);
+            apiErr = e;
         }
         try {
             return fetchLatestFromRawGradle();
         } catch (Exception e) {
-            errors.add(e);
-            LavaMenuClient.LOGGER.warn("Update raw gradle failed: {}", e.toString());
+            if (apiErr != null) e.addSuppressed(apiErr);
+            throw e;
         }
-        Exception last = errors.isEmpty()
-                ? new IllegalStateException("нет источников")
-                : errors.get(errors.size() - 1);
-        for (int i = 0; i < errors.size() - 1; i++) {
-            last.addSuppressed(errors.get(i));
-        }
-        throw last;
     }
 
-    private ReleaseInfo fetchLatestApi() throws Exception {
-        String body = httpGetString(API_LATEST, "application/vnd.github+json");
-        String tag = jsonString(body, "tag_name");
-        if (tag == null || tag.isBlank()) throw new IllegalStateException("нет tag_name");
-        String version = normalizeVersion(tag);
-        String jarUrl = findJarAssetUrl(body);
-        if (jarUrl == null) {
-            jarUrl = canonicalJarUrl(tag.startsWith("v") || tag.startsWith("V") ? tag : ("v" + version), version);
-        }
-        return new ReleaseInfo(version, jarUrl);
+    /** Оригинальный рабочий путь (v0.1.1). */
+    private ReleaseInfo fetchLatestApiHttpClient() throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(API_LATEST))
+                .timeout(Duration.ofSeconds(20))
+                .header("User-Agent", userAgent())
+                .header("Accept", "application/vnd.github+json")
+                .GET()
+                .build();
+        HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        return parseApiBody(resp.statusCode(), resp.body());
     }
 
-    private ReleaseInfo fetchLatestWebRedirect() throws Exception {
-        HttpURLConnection conn = open(WEB_LATEST, false);
+    private ReleaseInfo fetchLatestApiUrlConnection() throws Exception {
+        URL url = URI.create(API_LATEST).toURL();
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection(Proxy.NO_PROXY);
+        conn.setConnectTimeout(12_000);
+        conn.setReadTimeout(25_000);
+        conn.setRequestProperty("User-Agent", userAgent());
+        conn.setRequestProperty("Accept", "application/vnd.github+json");
         try {
-            conn.setInstanceFollowRedirects(false);
             int code = conn.getResponseCode();
-            String location = conn.getHeaderField("Location");
-            if (location == null || location.isBlank()) {
-                location = conn.getHeaderField("location");
+            String body;
+            try (InputStream in = code / 100 == 2 ? conn.getInputStream() : conn.getErrorStream()) {
+                body = in == null ? "" : readUtf8(in);
             }
-            if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308)
-                    && location != null && !location.isBlank()) {
-                Matcher m = TAG_IN_URL.matcher(location);
-                if (!m.find()) throw new IllegalStateException("нет тега в Location");
-                String tag = m.group(1);
-                String version = normalizeVersion(tag);
-                String tagPath = tag.startsWith("v") || tag.startsWith("V") ? tag : ("v" + version);
-                return new ReleaseInfo(version, canonicalJarUrl(tagPath, version));
-            }
-            throw new IllegalStateException("web HTTP " + code);
+            return parseApiBody(code, body);
         } finally {
             conn.disconnect();
         }
     }
 
     private ReleaseInfo fetchLatestFromRawGradle() throws Exception {
-        String props = httpGetString(RAW_GRADLE, "*/*");
+        String props;
+        try {
+            props = getStringHttpClient(RAW_GRADLE);
+        } catch (Exception e) {
+            props = getStringUrlConnection(RAW_GRADLE);
+        }
         Matcher m = MOD_VERSION.matcher(props);
         if (!m.find()) throw new IllegalStateException("нет mod.version");
         String version = normalizeVersion(m.group(1));
-        // предпочитаем raw jar из репо (часто доступен, когда releases режут)
-        String jarUrl = String.format(Locale.ROOT, RAW_JAR, version);
+        return new ReleaseInfo(version, String.format(Locale.ROOT, RAW_JAR, version));
+    }
+
+    private static ReleaseInfo parseApiBody(int statusCode, String body) throws Exception {
+        if (statusCode == 404) throw new IllegalStateException("релизов нет");
+        if (statusCode == 403 || statusCode == 429) throw new IllegalStateException("лимит GitHub " + statusCode);
+        if (statusCode / 100 != 2) throw new IllegalStateException("HTTP " + statusCode);
+        String tag = jsonString(body, "tag_name");
+        if (tag == null || tag.isBlank()) throw new IllegalStateException("нет tag_name");
+        String version = normalizeVersion(tag);
+        String jarUrl = findJarAssetUrl(body);
+        if (jarUrl == null) {
+            jarUrl = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
+                    + "/releases/download/v" + version + "/lavamenu-" + version + ".jar";
+        }
         return new ReleaseInfo(version, jarUrl);
     }
 
-    private static String canonicalJarUrl(String tagPath, String version) {
-        return "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
-                + "/releases/download/" + tagPath + "/lavamenu-" + version + ".jar";
+    private static String getStringHttpClient(String url) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(20))
+                .header("User-Agent", userAgent())
+                .GET()
+                .build();
+        HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (resp.statusCode() / 100 != 2) throw new IllegalStateException("HTTP " + resp.statusCode());
+        return resp.body();
     }
 
-    private static String httpGetString(String url, String accept) throws Exception {
-        HttpURLConnection conn = open(url, true);
+    private static String getStringUrlConnection(String urlStr) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) URI.create(urlStr).toURL().openConnection(Proxy.NO_PROXY);
+        conn.setConnectTimeout(12_000);
+        conn.setReadTimeout(25_000);
+        conn.setRequestProperty("User-Agent", userAgent());
         try {
-            conn.setRequestProperty("Accept", accept);
             int code = conn.getResponseCode();
-            if (code == 404) throw new IllegalStateException("404");
-            if (code == 403 || code == 429) throw new IllegalStateException("лимит GitHub " + code);
             if (code / 100 != 2) throw new IllegalStateException("HTTP " + code);
             try (InputStream in = conn.getInputStream()) {
                 return readUtf8(in);
@@ -429,37 +479,6 @@ public final class ModUpdateService {
         } finally {
             conn.disconnect();
         }
-    }
-
-    private static HttpURLConnection open(String urlStr, boolean followRedirects) throws Exception {
-        URL url = URI.create(urlStr).toURL();
-        Proxy proxy = minecraftProxy();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection(proxy);
-        conn.setConnectTimeout(CONNECT_MS);
-        conn.setReadTimeout(READ_MS);
-        conn.setInstanceFollowRedirects(followRedirects);
-        conn.setRequestMethod("GET");
-        conn.setRequestProperty("User-Agent", userAgent());
-        conn.setRequestProperty("Accept-Encoding", "identity");
-        if (conn instanceof HttpsURLConnection https) {
-            // дефолтный SSL контекст JVM Minecraft
-            https.setSSLSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
-        }
-        return conn;
-    }
-
-    private static Proxy minecraftProxy() {
-        try {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null) {
-                Proxy p = mc.getProxy();
-                if (p != null && p.type() != Proxy.Type.DIRECT) {
-                    return p;
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return Proxy.NO_PROXY;
     }
 
     private static String readUtf8(InputStream in) throws Exception {
@@ -529,42 +548,24 @@ public final class ModUpdateService {
 
     private static String shortError(Exception e) {
         Throwable t = e;
-        while (t.getCause() != null && t.getCause() != t) {
-            t = t.getCause();
-        }
+        while (t.getCause() != null && t.getCause() != t) t = t.getCause();
         if (t instanceof SSLException || nameHas(t, "SSL", "PKIX", "Certificate")) {
-            return "SSL/сеть (антивирус?)";
+            return "SSL/сеть";
         }
-        if (t instanceof UnknownHostException) {
-            return "нет DNS/сети";
-        }
-        if (t instanceof ConnectException) {
-            return "нет соединения";
-        }
-        if (t instanceof SocketTimeoutException || nameHas(t, "Timeout", "TimedOut")) {
+        if (t instanceof UnknownHostException) return "нет DNS";
+        if (t instanceof ConnectException) return "нет соединения";
+        if (t instanceof HttpTimeoutException || t instanceof SocketTimeoutException || nameHas(t, "Timeout")) {
             return "таймаут";
         }
-        if (t instanceof java.net.SocketException) {
-            return "сеть: " + safeMsg(t);
-        }
-        String m = safeMsg(t);
-        if (m == null || m.isBlank()) m = safeMsg(e);
+        String m = t.getMessage();
+        if (m == null || m.isBlank()) m = e.getMessage();
         if (m == null || m.isBlank()) m = t.getClass().getSimpleName();
-        if (m.toLowerCase(Locale.ROOT).startsWith("https://") || m.toLowerCase(Locale.ROOT).startsWith("http://")) {
-            return "сеть/HTTPS";
-        }
         if (m.length() > 42) m = m.substring(0, 39) + "…";
         return m;
     }
 
-    private static String safeMsg(Throwable t) {
-        return t.getMessage();
-    }
-
     private static boolean nameHas(Throwable t, String... parts) {
-        String n = t.getClass().getName();
-        String m = t.getMessage() == null ? "" : t.getMessage();
-        String hay = n + " " + m;
+        String hay = t.getClass().getName() + " " + (t.getMessage() == null ? "" : t.getMessage());
         for (String p : parts) {
             if (hay.contains(p)) return true;
         }

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "lavamenu",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": ["mzrb"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "ru.lava.lavamenu.LavaMenuClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18",
+    "minecraft": "${mcdep}",
+    "fabric-api": "*"
+  }
+}
+

@@ -1,0 +1,26 @@
+.DS_Store
+**/.DS_Store
+.idea/
+*.iml
+.vscode/
+.cursor/
+
+# Local / agent-only docs (not published)
+docs/AI_CONTEXT.md
+docs/SESSION.md
+docs/TASKS.md
+
+# Neighbor modpack JARs (huge, not part of this mod)
+mods/**
+!mods/README.txt
+
+# Gradle
+source/.gradle/
+source/build/
+source/run/
+source/out/
+
+# Optional local overrides
+*.log
+.env
+.env.*

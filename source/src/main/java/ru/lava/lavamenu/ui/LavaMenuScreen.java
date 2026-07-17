@@ -1,12 +1,16 @@
 package ru.lava.lavamenu.ui;
 
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.fabricmc.loader.api.FabricLoader;
+import com.mojang.blaze3d.platform.InputConstants;
+import org.lwjgl.glfw.GLFW;
 import ru.lava.lavamenu.LavaMenuClient;
 import ru.lava.lavamenu.chat.ChatMessage;
 import ru.lava.lavamenu.chat.ChatNotifySound;
@@ -17,6 +21,7 @@ import ru.lava.lavamenu.config.RadialAction;
 import ru.lava.lavamenu.homes.HomeRenameSession;
 import ru.lava.lavamenu.homes.HomesData;
 import ru.lava.lavamenu.homes.HomesParser;
+import ru.lava.lavamenu.input.KeyBindings;
 import ru.lava.lavamenu.notebook.AstoriaNotebookStore;
 import ru.lava.lavamenu.notebook.NotebookAccess;
 import ru.lava.lavamenu.notebook.NotebookEntry;
@@ -70,6 +75,8 @@ public final class LavaMenuScreen extends Screen {
 
     private LavaWidgets.ToggleSwitch pvpToggle;
     private LavaWidgets.ToggleSwitch radialModeToggle;
+    /** Ожидание новой клавиши в Настройках (null — не слушаем). */
+    private KeyMapping waitingBind;
 
     public LavaMenuScreen() { this(Tab.HOMES); }
 
@@ -148,11 +155,16 @@ public final class LavaMenuScreen extends Screen {
         }
         tab = t;
         homesScrollPx = friendsScroll = chatsScroll = notebookScroll = radialScroll = 0;
+        waitingBind = null;
         rebuildWidgets();
     }
 
     private int panelH() {
         return UiTheme.PANEL_HEIGHT;
+    }
+
+    private int panelW() {
+        return NotebookAccess.canView() ? UiTheme.PANEL_WIDTH_NOTEBOOK : UiTheme.PANEL_WIDTH;
     }
 
     private int innerX() { return box[0] + UiTheme.PAD; }
@@ -201,10 +213,12 @@ public final class LavaMenuScreen extends Screen {
     private int notebookListBottom() { return innerBottom(); }
     private static int notebookStep() { return NOTEBOOK_ROW_H + UiTheme.ROW_GAP; }
 
-    // SETTINGS: секция «Управление» на innerY, дальше без наезда на вкладки
+    // SETTINGS: режим → 3 клавиши → notify → sound → update → slots
     private int settingsModeY() { return innerY() + 12; }
-    private int settingsHintY() { return settingsModeY() + 14; }
-    private int settingsNotifyY() { return settingsHintY() + 14; }
+    private int settingsBindMainY() { return settingsModeY() + 16; }
+    private int settingsBindRadialY() { return settingsBindMainY() + 17; }
+    private int settingsBindToastY() { return settingsBindRadialY() + 17; }
+    private int settingsNotifyY() { return settingsBindToastY() + 16; }
     private int settingsSoundY() { return settingsNotifyY() + 16; }
     private int settingsUpdateY() { return settingsSoundY() + 18; }
     private int settingsUpdateBtnY() { return settingsUpdateY() + 11; }
@@ -214,7 +228,7 @@ public final class LavaMenuScreen extends Screen {
 
     @Override
     protected void repositionElements() {
-        MenuPanel.layout(width, height, panelH(), box);
+        MenuPanel.layout(width, height, panelH(), box, panelW());
         super.repositionElements();
     }
 
@@ -229,9 +243,9 @@ public final class LavaMenuScreen extends Screen {
         if (tab == Tab.NOTEBOOK && !NotebookAccess.canView()) {
             tab = Tab.HOMES;
         }
-        MenuPanel.layout(width, height, panelH(), box);
+        MenuPanel.layout(width, height, panelH(), box, panelW());
         int tabY = box[1] + UiTheme.TAB_Y;
-        int gap = 3;
+        int gap = 2;
         boolean showNotebook = NotebookAccess.canView();
         int tabCount = showNotebook ? 6 : 5;
         int tabW = (innerW() - gap * (tabCount - 1)) / tabCount;
@@ -621,6 +635,10 @@ public final class LavaMenuScreen extends Screen {
                 });
         addRenderableWidget(radialModeToggle);
 
+        addKeyBindRow(px, w, settingsBindMainY(), "lavamenu.keys.bind_main", KeyBindings.OPEN_MAIN);
+        addKeyBindRow(px, w, settingsBindRadialY(), "lavamenu.keys.bind_radial", KeyBindings.OPEN_RADIAL);
+        addKeyBindRow(px, w, settingsBindToastY(), "lavamenu.keys.bind_toast", KeyBindings.OPEN_REPLY);
+
         addRenderableWidget(LavaWidgets.toggle(px + w - UiTheme.TOGGLE_W, settingsNotifyY() + 1,
                 LavaMenuConfig.get().chatsNotify, on -> {
                     LavaMenuConfig.get().chatsNotify = on;
@@ -675,6 +693,43 @@ public final class LavaMenuScreen extends Screen {
                     () -> cycleRadialSlot(idx)));
             y += step();
         }
+    }
+
+    private void addKeyBindRow(int px, int w, int y, String labelKey, KeyMapping mapping) {
+        if (mapping == null) return;
+        int btnW = 72;
+        boolean waiting = waitingBind == mapping;
+        Component btnText = waiting
+                ? Component.translatable("lavamenu.keys.wait_short")
+                : mapping.getTranslatedKeyMessage();
+        addRenderableWidget(LavaWidgets.styled(px + w - btnW, y, btnW, UiTheme.ROW_H,
+                btnText, waiting ? LavaWidgets.BtnStyle.PRIMARY : LavaWidgets.BtnStyle.SECONDARY, () -> {
+                    waitingBind = mapping;
+                    rebuildWidgets();
+                }));
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (waitingBind != null && tab == Tab.SETTINGS) {
+            int key = event.key();
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                waitingBind = null;
+                rebuildWidgets();
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_BACKSPACE || key == GLFW.GLFW_KEY_DELETE) {
+                waitingBind.setKey(InputConstants.UNKNOWN);
+            } else {
+                waitingBind.setKey(InputConstants.Type.KEYSYM.getOrCreate(key));
+            }
+            KeyMapping.resetMapping();
+            Minecraft.getInstance().options.save();
+            waitingBind = null;
+            rebuildWidgets();
+            return true;
+        }
+        return super.keyPressed(event);
     }
 
     // ==================== helpers ====================
@@ -1057,19 +1112,25 @@ public final class LavaMenuScreen extends Screen {
         MenuPanel.drawScrollCap(gfx, x, innerY(), w, settingsSlotsTop() - innerY());
         MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.settings.section_keys"), x, py);
         int togglePad = UiTheme.TOGGLE_W + 6;
+        int bindPad = 78;
         gfx.text(font, Component.literal(ellipsize(
                         Component.translatable("lavamenu.radial.mode_label").getString(), w - togglePad)),
                 x, settingsModeY() + 2, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, Component.literal(ellipsize(
-                        Component.translatable("lavamenu.radial.controls_hint").getString(), w)),
-                x, settingsHintY(), UiTheme.TEXT_DIM, false);
+                        Component.translatable("lavamenu.keys.bind_main").getString(), w - bindPad)),
+                x, settingsBindMainY() + 4, UiTheme.TEXT_PRIMARY, false);
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.keys.bind_radial").getString(), w - bindPad)),
+                x, settingsBindRadialY() + 4, UiTheme.TEXT_PRIMARY, false);
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.keys.bind_toast").getString(), w - bindPad)),
+                x, settingsBindToastY() + 4, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, Component.literal(ellipsize(
                         Component.translatable("lavamenu.chats.notify").getString(), w - togglePad)),
                 x, settingsNotifyY() + 2, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, Component.literal(ellipsize(
                         Component.translatable("lavamenu.chats.notify_sound").getString(), w - 92)),
                 x, settingsSoundY() + 2, UiTheme.TEXT_PRIMARY, false);
-        // статус обновления — не залезает на кнопки справа (их нет в этой строке), но обрезаем по ширине
         String updLabel = ModUpdateService.get().statusLabel().getString();
         gfx.text(font, Component.literal(ellipsize(updLabel, w)), x, settingsUpdateY(),
                 ModUpdateService.get().updateAvailable() || ModUpdateService.get().needsRestart()

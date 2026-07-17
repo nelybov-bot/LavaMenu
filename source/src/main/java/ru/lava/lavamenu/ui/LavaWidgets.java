@@ -104,21 +104,37 @@ public final class LavaWidgets {
 
                 String label = getMessage().getString();
                 int pad = 2;
-                int need = UiTheme.ICON_SLOT + 3 + font().width(label);
-                boolean showText = need <= width - pad;
+                int iconSlot = 11;
+                int iconPx = 10;
+                int fg = active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED;
 
-                if (showText) {
-                    icon.drawInBox(gfx, getX() + pad, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX,
-                            active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED);
-                    gfx.text(font(), Component.literal(label),
-                            getX() + UiTheme.ICON_SLOT + pad + 1,
-                            getY() + textY(height),
-                            active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED, false);
+                // Компактно: текст всегда; иконка только если влезает целиком с подписью
+                int fullNeed = iconSlot + 2 + font().width(label);
+                boolean withIcon = fullNeed <= width - pad;
+
+                if (withIcon) {
+                    icon.drawInBox(gfx, getX() + pad, getY(), iconSlot, iconPx, fg);
+                    int tx = getX() + pad + iconSlot + 1;
+                    int maxTw = Math.max(0, getX() + width - pad - tx);
+                    String shown = label;
+                    if (font().width(shown) > maxTw && maxTw > 8) {
+                        shown = font().plainSubstrByWidth(shown, maxTw - font().width("…")) + "…";
+                    }
+                    if (!shown.isEmpty()) {
+                        gfx.text(font(), Component.literal(shown), tx, getY() + textY(height), fg, false);
+                    }
                 } else {
-                    // Узкая вкладка — только иконка по центру, без «Кома…»
-                    int ix = getX() + (width - UiTheme.ICON_SLOT) / 2;
-                    icon.drawInBox(gfx, ix, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX,
-                            active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED);
+                    // Без иконки — только текст (обрезать при нехватке места)
+                    int maxTw = Math.max(0, width - pad * 2);
+                    String shown = label;
+                    if (font().width(shown) > maxTw && maxTw > 8) {
+                        shown = font().plainSubstrByWidth(shown, maxTw - font().width("…")) + "…";
+                    }
+                    int tw = font().width(shown);
+                    int tx = getX() + Math.max(pad, (width - tw) / 2);
+                    if (!shown.isEmpty()) {
+                        gfx.text(font(), Component.literal(shown), tx, getY() + textY(height), fg, false);
+                    }
                 }
 
                 if (active) {

@@ -93,6 +93,7 @@
   "lavamenu.chats.notify_sound.off": "Без звука",
   "lavamenu.chats.toast_title": "Новое ЛС",
   "lavamenu.chats.toast_hint": "[%s] — ответить",
+  "lavamenu.chats.toast_open": "Открыть чат",
 
   "lavamenu.anim.sit": "Сесть",
   "lavamenu.anim.lay": "Лечь",
@@ -124,12 +125,14 @@
   "lavamenu.homes.delete_confirm": "Удалить точку «%s»?",
   "lavamenu.homes.list_title": "Список: %s / %s",
 
-  "lavamenu.keys.bind_main": "Меню (R)",
-  "lavamenu.keys.bind_radial": "Быстрое меню (G)",
+  "lavamenu.keys.bind_main": "Меню",
+  "lavamenu.keys.bind_radial": "Быстрое меню",
+  "lavamenu.keys.bind_toast": "Открыть уведомление",
   "lavamenu.keys.clear_radial": "Сбросить клавишу G",
-  "lavamenu.keys.wait": "Нажмите клавишу... (Esc — отмена, Backspace — очистить)",
+  "lavamenu.keys.wait": "Нажмите клавишу… (Esc — отмена, Backspace — очистить)",
+  "lavamenu.keys.wait_short": "…",
   "lavamenu.keys.unbound": "Не назначено",
-  "lavamenu.keys.hint": "Клавиши меняются здесь, не в настройках Minecraft.",
+  "lavamenu.keys.hint": "Клик по клавише — сменить.",
 
   "lavamenu.radial.enabled_on": "Быстрое меню: включено",
   "lavamenu.radial.enabled_off": "Быстрое меню: выключено",

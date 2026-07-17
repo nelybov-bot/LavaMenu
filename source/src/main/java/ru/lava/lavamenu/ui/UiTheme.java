@@ -24,7 +24,9 @@ public final class UiTheme {
     public static final int BACKDROP = 0x90000000;
 
     public static final int PAD = 8;
+    /** Базовая ширина; с вкладкой «Тетрадь» меню чуть шире ({@link #PANEL_WIDTH_NOTEBOOK}). */
     public static final int PANEL_WIDTH = 360;
+    public static final int PANEL_WIDTH_NOTEBOOK = 404;
     public static final int PANEL_HEIGHT = 290;
 
     public static final int HEADER_H = 18;

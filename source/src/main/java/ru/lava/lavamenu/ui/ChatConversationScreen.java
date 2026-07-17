@@ -27,6 +27,7 @@ public final class ChatConversationScreen extends Screen {
 
     private final Screen parent;
     private final String nick;
+    private final String draft;
     private final int[] box = new int[4];
     private EditBox input;
     /** 0 = верх (старые); max = низ (новые). */
@@ -36,9 +37,14 @@ public final class ChatConversationScreen extends Screen {
     private int lastContentH = 0;
 
     public ChatConversationScreen(Screen parent, String nick) {
+        this(parent, nick, "");
+    }
+
+    public ChatConversationScreen(Screen parent, String nick, String draft) {
         super(Component.literal(nick));
         this.parent = parent;
         this.nick = nick;
+        this.draft = draft == null ? "" : draft;
     }
 
     public void onChatsChanged() {
@@ -65,7 +71,13 @@ public final class ChatConversationScreen extends Screen {
                 Component.translatable("lavamenu.chats.input"));
         input.setMaxLength(256);
         input.setHint(Component.translatable("lavamenu.chats.input_hint"));
+        if (!draft.isEmpty()) {
+            input.setValue(draft);
+            input.setCursorPosition(draft.length());
+            input.setHighlightPos(draft.length());
+        }
         addRenderableWidget(input);
+        setInitialFocus(input);
         addRenderableWidget(LavaWidgets.icon(px + fieldW + 4, bottom - UiTheme.FIELD_H,
                 GuiIcons.SEND, LavaWidgets.BtnStyle.PRIMARY, this::send));
     }

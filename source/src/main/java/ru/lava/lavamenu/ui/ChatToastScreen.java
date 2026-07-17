@@ -3,6 +3,7 @@ package ru.lava.lavamenu.ui;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -15,6 +16,7 @@ import ru.lava.lavamenu.util.UiFeedback;
 
 /**
  * Режим ответа в тосте: без затемнения, {@code isPauseScreen=false}.
+ * Можно сразу открыть полный чат (с переносом черновика).
  */
 public final class ChatToastScreen extends Screen {
     public static final int PANEL_H = 72;
@@ -50,10 +52,12 @@ public final class ChatToastScreen extends Screen {
         panelY = height - PANEL_H - ChatToastService.MARGIN - 22;
 
         int pad = 6;
-        int sendW = UiTheme.ICON_BTN;
+        int iconW = UiTheme.ICON_BTN;
+        int gap = 4;
         int fieldX = panelX + pad;
         int fieldY = panelY + PANEL_H - pad - UiTheme.FIELD_H;
-        int fieldW = ChatToastService.TOAST_W - pad * 2 - sendW - 4;
+        // поле · открыть чат · отправить
+        int fieldW = ChatToastService.TOAST_W - pad * 2 - iconW * 2 - gap * 2;
 
         input = new EditBox(font, fieldX, fieldY, fieldW, UiTheme.FIELD_H,
                 Component.translatable("lavamenu.chats.input"));
@@ -62,8 +66,20 @@ public final class ChatToastScreen extends Screen {
         addRenderableWidget(input);
         setInitialFocus(input);
 
-        addRenderableWidget(LavaWidgets.icon(fieldX + fieldW + 4, fieldY,
+        int openX = fieldX + fieldW + gap;
+        var openBtn = LavaWidgets.icon(openX, fieldY, GuiIcons.USERS, LavaWidgets.BtnStyle.SECONDARY, this::openFullChat);
+        openBtn.setTooltip(Tooltip.create(Component.translatable("lavamenu.chats.toast_open")));
+        addRenderableWidget(openBtn);
+
+        addRenderableWidget(LavaWidgets.icon(openX + iconW + gap, fieldY,
                 GuiIcons.SEND, LavaWidgets.BtnStyle.PRIMARY, this::send));
+    }
+
+    private void openFullChat() {
+        String draft = input == null ? "" : input.getValue();
+        ChatStore.get().getOrCreate(nick);
+        ChatStore.get().save();
+        Minecraft.getInstance().setScreen(new ChatConversationScreen(null, nick, draft));
     }
 
     private void send() {
@@ -95,6 +111,12 @@ public final class ChatToastScreen extends Screen {
         if (mx < panelX || mx >= panelX + ChatToastService.TOAST_W
                 || my < panelY || my >= panelY + PANEL_H) {
             onClose();
+            return true;
+        }
+        // клик по шапке (ник / превью) — открыть полный чат
+        int fieldTop = panelY + PANEL_H - 6 - UiTheme.FIELD_H;
+        if (my < fieldTop) {
+            openFullChat();
             return true;
         }
         return super.mouseClicked(event, bl);

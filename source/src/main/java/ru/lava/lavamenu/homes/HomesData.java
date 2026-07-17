@@ -68,6 +68,22 @@ public final class HomesData {
         return all;
     }
 
+    public boolean hasNameExact(String name) {
+        if (name == null || name.isBlank()) return false;
+        for (String n : allNames()) {
+            if (n != null && n.equals(name)) return true;
+        }
+        return false;
+    }
+
+    public boolean hasNameIgnoreCase(String name) {
+        if (name == null || name.isBlank()) return false;
+        for (String n : allNames()) {
+            if (n != null && n.equalsIgnoreCase(name)) return true;
+        }
+        return false;
+    }
+
     public boolean isFull() {
         return count >= max;
     }

@@ -71,10 +71,14 @@ public final class ModUpdateService {
         this.uiListener = listener != null ? listener : () -> {};
     }
 
+    public void clearUiListener() {
+        this.uiListener = () -> {};
+    }
+
     private void notifyUi() {
         Minecraft mc = Minecraft.getInstance();
         Runnable r = uiListener;
-        mc.execute(r);
+        if (r != null) mc.execute(r);
     }
 
     public Status status() { return status; }
@@ -150,7 +154,6 @@ public final class ModUpdateService {
         CompletableFuture.runAsync(() -> {
             try {
                 ReleaseInfo info = fetchLatest();
-                lastCheckMs = System.currentTimeMillis();
                 remoteVersion = info.version;
                 downloadUrl = info.jarUrl;
                 int cmp = compareVersions(info.version, currentVersion());
@@ -176,6 +179,8 @@ public final class ModUpdateService {
                             UiFeedback.actionBar(Component.translatable("lavamenu.update.error", statusDetail)));
                 }
             } finally {
+                // и при ошибке — иначе фоновый тик долбит API каждый кадр
+                lastCheckMs = System.currentTimeMillis();
                 busy.set(false);
                 notifyUi();
             }

@@ -6,6 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.fabricmc.loader.api.FabricLoader;
 import org.lwjgl.glfw.GLFW;
+import ru.lava.lavamenu.chat.ChatNotifySound;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -31,6 +32,9 @@ public final class LavaMenuConfig {
     public final Homes homes = new Homes();
     public final List<FriendEntry> friends = new ArrayList<>();
     public boolean pvpEnabled = false;
+    /** Всплывающие уведомления о входящих ЛС. */
+    public boolean chatsNotify = true;
+    public ChatNotifySound chatsNotifySound = ChatNotifySound.CHIME;
 
     private Path configPath() {
         return FabricLoader.getInstance().getConfigDir().resolve("lavamenu.json");
@@ -77,6 +81,10 @@ public final class LavaMenuConfig {
                 }
             }
             if (root.has("pvpEnabled")) pvpEnabled = root.get("pvpEnabled").getAsBoolean();
+            if (root.has("chatsNotify")) chatsNotify = root.get("chatsNotify").getAsBoolean();
+            if (root.has("chatsNotifySound")) {
+                chatsNotifySound = ChatNotifySound.fromId(root.get("chatsNotifySound").getAsString());
+            }
             if (root.has("friends")) {
                 friends.clear();
                 root.getAsJsonArray("friends").forEach(e -> {
@@ -124,6 +132,8 @@ public final class LavaMenuConfig {
         root.add("homes", homesObj);
 
         root.addProperty("pvpEnabled", pvpEnabled);
+        root.addProperty("chatsNotify", chatsNotify);
+        root.addProperty("chatsNotifySound", chatsNotifySound == null ? ChatNotifySound.CHIME.id : chatsNotifySound.id);
         JsonArray friendsArr = new JsonArray();
         for (FriendEntry fe : friends) {
             JsonObject o = new JsonObject();

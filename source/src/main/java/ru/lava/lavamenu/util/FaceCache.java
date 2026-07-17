@@ -19,10 +19,12 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Кэш голов: онлайн → из PlayerInfo (как Tab/P), на диск PNG;
  * офлайн → последняя сохранённая; иначе — нет текстуры (инициалы снаружи).
+ * При смене скина (другой body Identifier) файл и текстура обновляются.
  */
 public final class FaceCache {
     private static final Logger LOGGER = LavaMenuClient.LOGGER;
@@ -31,6 +33,8 @@ public final class FaceCache {
 
     /** nickLower → зарегистрированная динамическая текстура (голова). */
     private final Map<String, Identifier> loaded = new HashMap<>();
+    /** nickLower → body скина, с которого снята голова (для детекта смены). */
+    private final Map<String, Identifier> capturedFromBody = new HashMap<>();
     /** nickLower → путь скина из последней сессии (пока текстура ещё в TextureManager). */
     private final Map<String, Identifier> sessionBody = new HashMap<>();
     private boolean dirLoaded;
@@ -77,7 +81,10 @@ public final class FaceCache {
         trimIfNeeded();
     }
 
-    /** Запомнить голову, если ещё не в файле / обновить из живого скина. */
+    /**
+     * Запомнить голову. Повторно пишет, если скин сменился
+     * или в памяти только PNG с диска без привязки к body.
+     */
     public boolean capture(PlayerInfo info) {
         if (info == null || info.getProfile() == null) return false;
         String name = info.getProfile().name();
@@ -89,7 +96,10 @@ public final class FaceCache {
         Identifier body = skin.body().texturePath();
         sessionBody.put(key, body);
 
-        if (loaded.containsKey(key)) return false;
+        Identifier previousBody = capturedFromBody.get(key);
+        if (loaded.containsKey(key) && previousBody != null && Objects.equals(previousBody, body)) {
+            return false;
+        }
 
         Minecraft mc = Minecraft.getInstance();
         AbstractTexture tex = mc.getTextureManager().getTexture(body);
@@ -105,6 +115,7 @@ public final class FaceCache {
             face.writeToFile(out);
             face.close();
             registerFile(key, out);
+            capturedFromBody.put(key, body);
             return true;
         } catch (Throwable t) {
             LOGGER.debug("FaceCache capture {}: {}", key, t.toString());
@@ -173,7 +184,6 @@ public final class FaceCache {
 
     private void trimIfNeeded() {
         if (loaded.size() <= MAX_FACES) return;
-        // удаляем самые старые файлы по mtime
         Path d = dir();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(d, "*.png")) {
             Path oldest = null;
@@ -192,6 +202,7 @@ public final class FaceCache {
                 String key = file.substring(0, file.length() - 4).toLowerCase(Locale.ROOT);
                 Files.deleteIfExists(oldest);
                 loaded.remove(key);
+                capturedFromBody.remove(key);
             }
         } catch (IOException ignored) {
         }

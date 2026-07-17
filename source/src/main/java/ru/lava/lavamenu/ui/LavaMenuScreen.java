@@ -8,14 +8,19 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.fabricmc.loader.api.FabricLoader;
 import ru.lava.lavamenu.LavaMenuClient;
+import ru.lava.lavamenu.chat.ChatMessage;
+import ru.lava.lavamenu.chat.ChatNotifySound;
 import ru.lava.lavamenu.chat.ChatStore;
 import ru.lava.lavamenu.chat.ChatThread;
-import ru.lava.lavamenu.chat.ChatMessage;
 import ru.lava.lavamenu.config.LavaMenuConfig;
 import ru.lava.lavamenu.config.RadialAction;
 import ru.lava.lavamenu.homes.HomeRenameSession;
 import ru.lava.lavamenu.homes.HomesData;
 import ru.lava.lavamenu.homes.HomesParser;
+import ru.lava.lavamenu.notebook.AstoriaNotebookStore;
+import ru.lava.lavamenu.notebook.NotebookAccess;
+import ru.lava.lavamenu.notebook.NotebookEntry;
+import ru.lava.lavamenu.notebook.NotebookShare;
 import ru.lava.lavamenu.util.AnimationHelper;
 import ru.lava.lavamenu.util.ChatTimeFormat;
 import ru.lava.lavamenu.util.CommandHelper;
@@ -30,16 +35,18 @@ import java.util.List;
 import java.util.Map;
 
 public final class LavaMenuScreen extends Screen {
-    public enum Tab { HOMES, COMMANDS, FRIENDS, CHATS, SETTINGS }
+    public enum Tab { HOMES, COMMANDS, FRIENDS, CHATS, NOTEBOOK, SETTINGS }
 
     private static final int DIM_HEADER_H = 16;
     private static final int CHAT_ROW_H = 36;
+    private static final int NOTEBOOK_ROW_H = 28;
 
     private final int[] box = new int[4];
     private Tab tab;
     private int homesScrollPx = 0;
     private int friendsScroll = 0;
     private int chatsScroll = 0;
+    private int notebookScroll = 0;
     private int radialScroll = 0;
     private int friendsOnlineTick = 0;
     private int chatsOnlineTick = 0;
@@ -49,9 +56,15 @@ public final class LavaMenuScreen extends Screen {
     private EditBox friendLabelField;
     private EditBox friendNickField;
     private EditBox chatNickField;
+    private EditBox notebookNickField;
+    private EditBox notebookReasonField;
+    private EditBox notebookShowField;
     private String friendLabelDraft = "";
     private String friendNickDraft = "";
     private String chatNickDraft = "";
+    private String notebookNickDraft = "";
+    private String notebookReasonDraft = "";
+    private String notebookShowDraft = "";
     private boolean homeOverwrite = false;
     private AbstractWidget overwriteBtn;
 
@@ -75,6 +88,11 @@ public final class LavaMenuScreen extends Screen {
 
     public void onChatsChanged() {
         if (tab == Tab.CHATS) rebuildWidgets();
+    }
+
+    public void onNotebookChanged() {
+        // всегда rebuild: могла появиться/пропасть вкладка «Тетрадь»
+        rebuildWidgets();
     }
 
     @Override
@@ -125,8 +143,11 @@ public final class LavaMenuScreen extends Screen {
 
     private void selectTab(Tab t) {
         if (tab == t) return;
+        if (tab == Tab.SETTINGS) {
+            ModUpdateService.get().clearUiListener();
+        }
         tab = t;
-        homesScrollPx = friendsScroll = chatsScroll = radialScroll = 0;
+        homesScrollPx = friendsScroll = chatsScroll = notebookScroll = radialScroll = 0;
         rebuildWidgets();
     }
 
@@ -167,10 +188,23 @@ public final class LavaMenuScreen extends Screen {
     private int chatsListBottom() { return innerBottom(); }
     private static int chatStep() { return CHAT_ROW_H + UiTheme.ROW_GAP; }
 
-    // SETTINGS: hold mode + hint, then slots block below (без наложения текста)
+    // NOTEBOOK
+    private int notebookAddY() { return innerY() + 10; }
+    private int notebookShowY() { return notebookAddY() + step(); }
+    private int notebookFormBottom() {
+        if (NotebookAccess.canEdit()) return notebookShowY() + UiTheme.FIELD_H;
+        return innerY() + 22;
+    }
+    private int notebookListTop() { return notebookFormBottom() + 14; }
+    private int notebookListBottom() { return innerBottom(); }
+    private static int notebookStep() { return NOTEBOOK_ROW_H + UiTheme.ROW_GAP; }
+
+    // SETTINGS: hold mode + hint + notify + sound, then update, then slots
     private int settingsModeY() { return innerY() + 8; }
     private int settingsHintY() { return settingsModeY() + 14; }
-    private int settingsUpdateY() { return settingsHintY() + 12; }
+    private int settingsNotifyY() { return settingsHintY() + 14; }
+    private int settingsSoundY() { return settingsNotifyY() + 16; }
+    private int settingsUpdateY() { return settingsSoundY() + 18; }
     private int settingsUpdateBtnY() { return settingsUpdateY() + 11; }
     private int settingsSlotsTop() { return settingsUpdateBtnY() + UiTheme.ROW_H + 8; }
     private int settingsSlotsListTop() { return settingsSlotsTop() + 12; }
@@ -183,22 +217,38 @@ public final class LavaMenuScreen extends Screen {
     }
 
     @Override
+    public void onClose() {
+        ModUpdateService.get().clearUiListener();
+        super.onClose();
+    }
+
+    @Override
     protected void init() {
+        if (tab == Tab.NOTEBOOK && !NotebookAccess.canView()) {
+            tab = Tab.HOMES;
+        }
         MenuPanel.layout(width, height, panelH(), box);
         int tabY = box[1] + UiTheme.TAB_Y;
         int gap = 2;
-        int tabW = (innerW() - gap * 4) / 5;
+        boolean showNotebook = NotebookAccess.canView();
+        int tabCount = showNotebook ? 6 : 5;
+        int tabW = (innerW() - gap * (tabCount - 1)) / tabCount;
         int tx = innerX();
+        int i = 0;
 
-        addRenderableWidget(LavaWidgets.tab(tx, tabY, tabW, UiTheme.TAB_H, GuiIcons.MAP_PIN,
+        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.MAP_PIN,
                 Component.translatable("lavamenu.tab.homes"), tab == Tab.HOMES, () -> selectTab(Tab.HOMES)));
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap), tabY, tabW, UiTheme.TAB_H, GuiIcons.TERMINAL,
+        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.TERMINAL,
                 Component.translatable("lavamenu.tab.commands"), tab == Tab.COMMANDS, () -> selectTab(Tab.COMMANDS)));
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * 2, tabY, tabW, UiTheme.TAB_H, GuiIcons.USERS,
+        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.USERS,
                 Component.translatable("lavamenu.tab.friends"), tab == Tab.FRIENDS, () -> selectTab(Tab.FRIENDS)));
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * 3, tabY, tabW, UiTheme.TAB_H, GuiIcons.SEND,
+        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.SEND,
                 Component.translatable("lavamenu.tab.chats"), tab == Tab.CHATS, () -> selectTab(Tab.CHATS)));
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * 4, tabY, tabW, UiTheme.TAB_H, GuiIcons.SETTINGS,
+        if (showNotebook) {
+            addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.EDIT,
+                    Component.translatable("lavamenu.tab.notebook"), tab == Tab.NOTEBOOK, () -> selectTab(Tab.NOTEBOOK)));
+        }
+        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i, tabY, tabW, UiTheme.TAB_H, GuiIcons.SETTINGS,
                 Component.translatable("lavamenu.tab.settings"), tab == Tab.SETTINGS, () -> selectTab(Tab.SETTINGS)));
 
         switch (tab) {
@@ -206,6 +256,7 @@ public final class LavaMenuScreen extends Screen {
             case COMMANDS -> initCommands();
             case FRIENDS -> initFriends();
             case CHATS -> initChats();
+            case NOTEBOOK -> initNotebook();
             case SETTINGS -> initSettings();
         }
     }
@@ -442,6 +493,118 @@ public final class LavaMenuScreen extends Screen {
         Minecraft.getInstance().setScreen(new ChatConversationScreen(this, nick));
     }
 
+    // ==================== NOTEBOOK ====================
+
+    private void initNotebook() {
+        boolean edit = NotebookAccess.canEdit();
+        int px = innerX(), w = innerW();
+
+        if (edit) {
+            if (notebookNickField != null) notebookNickDraft = notebookNickField.getValue();
+            if (notebookReasonField != null) notebookReasonDraft = notebookReasonField.getValue();
+            if (notebookShowField != null) notebookShowDraft = notebookShowField.getValue();
+
+            int gap = 4;
+            int addW = UiTheme.ICON_BTN;
+            int nickW = (w - addW - gap * 2) / 2;
+
+            notebookNickField = new EditBox(font, px, notebookAddY(), nickW, UiTheme.FIELD_H,
+                    Component.translatable("lavamenu.notebook.nick"));
+            notebookNickField.setHint(Component.translatable("lavamenu.notebook.nick_hint"));
+            notebookNickField.setMaxLength(16);
+            notebookNickField.setValue(notebookNickDraft);
+            addRenderableWidget(notebookNickField);
+
+            notebookReasonField = new EditBox(font, px + nickW + gap, notebookAddY(), nickW, UiTheme.FIELD_H,
+                    Component.translatable("lavamenu.notebook.reason"));
+            notebookReasonField.setHint(Component.translatable("lavamenu.notebook.reason_hint"));
+            notebookReasonField.setMaxLength(64);
+            notebookReasonField.setValue(notebookReasonDraft);
+            addRenderableWidget(notebookReasonField);
+
+            addRenderableWidget(LavaWidgets.iconBtn(px + w - addW, notebookAddY(), GuiIcons.PLUS,
+                    LavaWidgets.BtnStyle.PRIMARY, this::addNotebookEntry));
+
+            int showBtnW = 72;
+            notebookShowField = new EditBox(font, px, notebookShowY(), w - showBtnW - gap, UiTheme.FIELD_H,
+                    Component.translatable("lavamenu.notebook.show_nick"));
+            notebookShowField.setHint(Component.translatable("lavamenu.notebook.show_nick_hint"));
+            notebookShowField.setMaxLength(16);
+            notebookShowField.setValue(notebookShowDraft);
+            addRenderableWidget(notebookShowField);
+            addRenderableWidget(LavaWidgets.styled(px + w - showBtnW, notebookShowY(), showBtnW, UiTheme.ROW_H,
+                    Component.translatable("lavamenu.notebook.show"),
+                    LavaWidgets.BtnStyle.SECONDARY, this::shareNotebook));
+        }
+
+        List<NotebookEntry> list = AstoriaNotebookStore.get().entries();
+        int top = notebookListTop(), bottom = notebookListBottom();
+        int y = top - notebookScroll * notebookStep();
+        for (NotebookEntry entry : list) {
+            if (!MenuPanel.rowInside(y, NOTEBOOK_ROW_H, top, bottom)) {
+                y += notebookStep();
+                continue;
+            }
+            if (!edit) {
+                y += notebookStep();
+                continue;
+            }
+            String nick = entry.nick;
+            int bx = px + w - 34;
+            addRenderableWidget(LavaWidgets.icon(bx, y + (NOTEBOOK_ROW_H - UiTheme.ICON_BTN) / 2, GuiIcons.EDIT, () ->
+                    Minecraft.getInstance().setScreen(new RenameEntryScreen(this,
+                            Component.translatable("lavamenu.notebook.edit_reason"),
+                            Component.translatable("lavamenu.notebook.reason_hint"),
+                            entry.reason, neu -> {
+                                AstoriaNotebookStore.get().setReason(nick, neu);
+                                rebuildWidgets();
+                            }))));
+            addRenderableWidget(LavaWidgets.icon(bx + 17, y + (NOTEBOOK_ROW_H - UiTheme.ICON_BTN) / 2,
+                    GuiIcons.TRASH, LavaWidgets.BtnStyle.DANGER, () ->
+                            Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+                                    Component.translatable("lavamenu.confirm.title"),
+                                    Component.translatable("lavamenu.notebook.delete_confirm", nick),
+                                    () -> {
+                                        AstoriaNotebookStore.get().remove(nick);
+                                        rebuildWidgets();
+                                    }))));
+            y += notebookStep();
+        }
+    }
+
+    private void addNotebookEntry() {
+        String nick = notebookNickField == null ? "" : notebookNickField.getValue().trim();
+        String reason = notebookReasonField == null ? "" : notebookReasonField.getValue().trim();
+        if (nick.isEmpty()) {
+            UiFeedback.actionBar(Component.translatable("lavamenu.notebook.err_nick"));
+            return;
+        }
+        AstoriaNotebookStore.get().add(nick, reason);
+        notebookNickDraft = "";
+        notebookReasonDraft = "";
+        if (notebookNickField != null) notebookNickField.setValue("");
+        if (notebookReasonField != null) notebookReasonField.setValue("");
+        UiFeedback.actionBar(Component.translatable("lavamenu.notebook.added", nick));
+        rebuildWidgets();
+    }
+
+    private void shareNotebook() {
+        String nick = notebookShowField == null ? "" : notebookShowField.getValue().trim();
+        if (nick.isEmpty()) {
+            UiFeedback.actionBar(Component.translatable("lavamenu.notebook.err_show_nick"));
+            return;
+        }
+        if (AstoriaNotebookStore.get().entries().isEmpty()) {
+            UiFeedback.actionBar(Component.translatable("lavamenu.notebook.err_empty"));
+            return;
+        }
+        List<String> lines = NotebookShare.encode(
+                AstoriaNotebookStore.get().entries(),
+                NotebookAccess.actorName());
+        NotebookShare.sendTo(nick, lines);
+        // успех — после последнего /msg внутри NotebookShare
+    }
+
     // ==================== SETTINGS ====================
 
     private void initSettings() {
@@ -455,6 +618,26 @@ public final class LavaMenuScreen extends Screen {
                     LavaMenuConfig.get().save();
                 });
         addRenderableWidget(radialModeToggle);
+
+        addRenderableWidget(LavaWidgets.toggle(px + w - UiTheme.TOGGLE_W, settingsNotifyY() + 1,
+                LavaMenuConfig.get().chatsNotify, on -> {
+                    LavaMenuConfig.get().chatsNotify = on;
+                    LavaMenuConfig.get().save();
+                }));
+
+        ChatNotifySound sound = LavaMenuConfig.get().chatsNotifySound;
+        if (sound == null) sound = ChatNotifySound.CHIME;
+        final ChatNotifySound soundBtn = sound;
+        addRenderableWidget(LavaWidgets.styled(px + w - 88, settingsSoundY(), 88, UiTheme.ROW_H,
+                soundBtn.label(), LavaWidgets.BtnStyle.SECONDARY, () -> {
+                    ChatNotifySound cur = LavaMenuConfig.get().chatsNotifySound;
+                    if (cur == null) cur = ChatNotifySound.CHIME;
+                    ChatNotifySound next = cur.next();
+                    LavaMenuConfig.get().chatsNotifySound = next;
+                    LavaMenuConfig.get().save();
+                    next.play();
+                    rebuildWidgets();
+                }));
 
         int half = (w - UiTheme.ROW_GAP) / 2;
         int by = settingsUpdateBtnY();
@@ -583,6 +766,7 @@ public final class LavaMenuScreen extends Screen {
             case COMMANDS -> drawCommandsOverlay(gfx);
             case FRIENDS -> drawFriendsOverlay(gfx, mouseX, mouseY);
             case CHATS -> drawChatsOverlay(gfx, mouseX, mouseY);
+            case NOTEBOOK -> drawNotebookOverlay(gfx, mouseX, mouseY);
             case SETTINGS -> drawSettingsOverlay(gfx);
         }
 
@@ -786,12 +970,69 @@ public final class LavaMenuScreen extends Screen {
         });
     }
 
+    private void drawNotebookOverlay(GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
+        int x = innerX(), w = innerW();
+        MenuPanel.drawScrollCap(gfx, x, innerY(), w, notebookFormBottom() - innerY());
+        MenuPanel.drawDivider(gfx, x, notebookListTop() - 3, w);
+        gfx.text(font, Component.translatable("lavamenu.notebook.title"),
+                x, notebookListTop() - 10, UiTheme.TEXT_PRIMARY, false);
+        if (!NotebookAccess.canEdit()) {
+            String from = AstoriaNotebookStore.get().sharedFrom();
+            if (from != null && !from.isBlank()) {
+                gfx.text(font, Component.translatable("lavamenu.notebook.from", from),
+                        x, notebookListTop() - 20, UiTheme.TEXT_DIM, false);
+            } else {
+                gfx.text(font, Component.translatable("lavamenu.notebook.readonly_hint"),
+                        x, notebookListTop() - 20, UiTheme.TEXT_DIM, false);
+            }
+        }
+
+        List<NotebookEntry> list = AstoriaNotebookStore.get().entries();
+        if (list.isEmpty()) {
+            String emptyKey;
+            if (NotebookAccess.canEdit()) {
+                emptyKey = "lavamenu.notebook.empty";
+            } else if (AstoriaNotebookStore.get().sharedFrom().isBlank()) {
+                emptyKey = "lavamenu.notebook.empty_view";
+            } else {
+                emptyKey = "lavamenu.notebook.empty_shown";
+            }
+            gfx.text(font, Component.translatable(emptyKey),
+                    x, notebookListTop() + 2, UiTheme.TEXT_DIM, false);
+            return;
+        }
+
+        int top = notebookListTop(), bottom = notebookListBottom();
+        int actionsW = NotebookAccess.canEdit() ? 34 : 0;
+        MenuPanel.withScissor(gfx, x, top, w, bottom - top, () -> {
+            int y = top - notebookScroll * notebookStep();
+            for (NotebookEntry entry : list) {
+                if (y > bottom) return;
+                if (!MenuPanel.rowVisible(y, NOTEBOOK_ROW_H, top, bottom)) {
+                    y += notebookStep();
+                    continue;
+                }
+                if (mouseX >= x && mouseX < x + w - actionsW && mouseY >= y && mouseY < y + NOTEBOOK_ROW_H) {
+                    MenuPanel.drawRowHover(gfx, x, y, w - actionsW, NOTEBOOK_ROW_H);
+                }
+                PlayerFaces.draw(gfx, font, entry.nick, x + 1, y + (NOTEBOOK_ROW_H - 12) / 2, 12);
+                String reason = entry.reason.isBlank() ? "—" : entry.reason;
+                gfx.text(font, Component.literal(entry.nick), x + 18, y + 2, UiTheme.TEXT_PRIMARY, false);
+                gfx.text(font, Component.literal(ellipsize(reason, w - actionsW - 22)),
+                        x + 18, y + 14, UiTheme.TEXT_MUTED, false);
+                y += notebookStep();
+            }
+        });
+    }
+
     private void drawSettingsOverlay(GuiGraphicsExtractor gfx) {
         int x = innerX(), py = innerY(), w = innerW();
         MenuPanel.drawScrollCap(gfx, x, innerY(), w, settingsSlotsTop() - innerY());
         MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.settings.section_keys"), x, py - 9);
         gfx.text(font, Component.translatable("lavamenu.radial.mode_label"), x, settingsModeY() + 2, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, Component.translatable("lavamenu.radial.controls_hint"), x, settingsHintY(), UiTheme.TEXT_DIM, false);
+        gfx.text(font, Component.translatable("lavamenu.chats.notify"), x, settingsNotifyY() + 2, UiTheme.TEXT_PRIMARY, false);
+        gfx.text(font, Component.translatable("lavamenu.chats.notify_sound"), x, settingsSoundY() + 2, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, ModUpdateService.get().statusLabel(), x, settingsUpdateY(),
                 ModUpdateService.get().updateAvailable() || ModUpdateService.get().needsRestart()
                         ? UiTheme.WORLD_GREEN : UiTheme.TEXT_DIM, false);
@@ -821,6 +1062,15 @@ public final class LavaMenuScreen extends Screen {
             int vis = Math.max(1, (chatsListBottom() - chatsListTop()) / chatStep());
             int max = Math.max(0, ChatStore.get().threadsNewestFirst().size() - vis + 1);
             chatsScroll = Math.max(0, Math.min(max, chatsScroll - (int) scrollY));
+            rebuildWidgets();
+            return true;
+        }
+        if (tab == Tab.NOTEBOOK && !AstoriaNotebookStore.get().entries().isEmpty()
+                && MenuPanel.inRect(mouseX, mouseY, innerX(), notebookListTop(), innerW(),
+                notebookListBottom() - notebookListTop())) {
+            int vis = Math.max(1, (notebookListBottom() - notebookListTop()) / notebookStep());
+            int max = Math.max(0, AstoriaNotebookStore.get().size() - vis + 1);
+            notebookScroll = Math.max(0, Math.min(max, notebookScroll - (int) scrollY));
             rebuildWidgets();
             return true;
         }

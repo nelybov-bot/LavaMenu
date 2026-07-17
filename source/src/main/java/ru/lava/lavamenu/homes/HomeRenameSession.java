@@ -62,11 +62,10 @@ public final class HomeRenameSession {
     /** Вызывается после штатного/таймаутного конца сессии парсера /homes. */
     public static void onHomesListParsed() {
         if (!active) return;
-        if (HomesData.get().allNames().contains(newName)) {
+        if (HomesData.get().hasNameExact(newName)) {
             String del = oldName;
             String neu = newName;
             cancelQuiet();
-            // Не удаляем, если имена совпали (не должно случиться) или new ещё не отличен
             if (!del.equals(neu)) {
                 CommandHelper.sendFromUi("delhome " + del);
                 UiFeedback.actionBar(Component.translatable("lavamenu.homes.rename_done", del, neu));

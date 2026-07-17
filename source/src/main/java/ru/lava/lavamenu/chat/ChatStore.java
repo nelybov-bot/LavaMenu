@@ -192,6 +192,10 @@ public final class ChatStore {
 
         save();
         notifyChanged();
+
+        if (fromServer && !outgoing) {
+            ChatToastService.onIncoming(t.nick, text);
+        }
     }
 
     public synchronized int totalUnread() {

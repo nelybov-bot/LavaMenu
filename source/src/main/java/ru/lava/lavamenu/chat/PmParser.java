@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import ru.lava.lavamenu.LavaMenuClient;
 import ru.lava.lavamenu.homes.HomesParser;
+import ru.lava.lavamenu.notebook.NotebookShare;
 
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -74,6 +75,15 @@ public final class PmParser {
         }
 
         if (left.isEmpty() || right.isEmpty() || text.isEmpty()) return false;
+
+        // Пакет тетрадки через /msg — не кладём в Чаты
+        if (NotebookShare.isSharePayload(text)) {
+            if (isYou(left)) return true; // своё эхо
+            if (isIncomingTarget(right) && !isYou(left)) {
+                NotebookShare.tryConsume(text, left);
+            }
+            return true;
+        }
 
         if (isYou(left)) {
             ChatStore.get().addMessage(right, true, text, clock, true);

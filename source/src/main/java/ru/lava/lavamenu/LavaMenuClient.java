@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.lava.lavamenu.chat.ChatStore;
+import ru.lava.lavamenu.chat.ChatToastService;
 import ru.lava.lavamenu.chat.PmChatListener;
 import ru.lava.lavamenu.config.LavaMenuConfig;
 import ru.lava.lavamenu.homes.HomeRenameSession;
@@ -13,6 +14,8 @@ import ru.lava.lavamenu.homes.HomesChatListener;
 import ru.lava.lavamenu.homes.HomesData;
 import ru.lava.lavamenu.homes.HomesParser;
 import ru.lava.lavamenu.input.KeyBindings;
+import ru.lava.lavamenu.notebook.AstoriaNotebookStore;
+import ru.lava.lavamenu.notebook.NotebookShare;
 import ru.lava.lavamenu.update.ModUpdateService;
 import ru.lava.lavamenu.util.AnimationHelper;
 import ru.lava.lavamenu.util.FaceCache;
@@ -34,11 +37,13 @@ public final class LavaMenuClient implements ClientModInitializer {
     public void onInitializeClient() {
         LavaMenuConfig.get().load();
         ChatStore.get().load();
+        AstoriaNotebookStore.get().load();
         FaceCache.get().ensureLoaded();
         LavaMenuConfig.get().radial.ensureDefaults();
         KeyBindings.register();
         HomesChatListener.register();
         PmChatListener.register();
+        ChatToastService.registerHud();
         AnimationHelper.register();
         ModUpdateService.get().cleanupPendingDeletes();
 
@@ -62,9 +67,20 @@ public final class LavaMenuClient implements ClientModInitializer {
             });
         });
 
+        AstoriaNotebookStore.get().setChangeListener(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            mc.execute(() -> {
+                if (mc.screen instanceof LavaMenuScreen screen) {
+                    screen.onNotebookChanged();
+                }
+            });
+        });
+
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             HomesParser.tick();
             HomeRenameSession.tick();
+            NotebookShare.tick();
+            ChatToastService.tick();
             FaceCache.get().tick();
 
             while (KeyBindings.OPEN_MAIN.consumeClick()) {

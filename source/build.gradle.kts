@@ -40,8 +40,8 @@ dependencies {
     modstitchModImplementation("net.fabricmc.fabric-api:fabric-lifecycle-events-v1:4.0.5+c82f0461c3")
     modstitchModImplementation("net.fabricmc.fabric-api:fabric-key-mapping-api-v1:${prop("deps.keymap")}")
     modstitchModImplementation("net.fabricmc.fabric-api:fabric-message-api-v1:${prop("deps.msg")}")
+    modstitchModImplementation("net.fabricmc.fabric-api:fabric-rendering-v1:${prop("deps.render")}")
 }
-
 tasks.processResources {
     // modstitch уже делает подстановки, но оставим и version для удобства
     inputs.property("version", prop("mod.version"))

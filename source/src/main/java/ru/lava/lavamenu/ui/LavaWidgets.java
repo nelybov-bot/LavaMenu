@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.InputWithModifiers;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -89,29 +90,44 @@ public final class LavaWidgets {
     }
 
     public static AbstractButton tab(int x, int y, int w, int h, GuiIcons icon, Component text, boolean active, Runnable onPress) {
-        return new LavaButtonBase(x, y, w, h, text) {
+        AbstractButton btn = new LavaButtonBase(x, y, w, h, text) {
             @Override
             public void onPress(InputWithModifiers input) { onPress.run(); }
 
             @Override
             protected void extractContents(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float delta) {
-                if (active) gfx.fill(getX(), getY(), getX() + width, getY() + height, UiTheme.TAB_ACTIVE_BG);
-                icon.drawInBox(gfx, getX() + 1, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX,
-                        active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED);
+                if (active) {
+                    gfx.fill(getX(), getY(), getX() + width, getY() + height, UiTheme.TAB_ACTIVE_BG);
+                } else if (isHovered()) {
+                    gfx.fill(getX(), getY(), getX() + width, getY() + height, UiTheme.ROW_HOVER);
+                }
+
                 String label = getMessage().getString();
-                int textX = getX() + UiTheme.ICON_SLOT + 2;
-                int maxTw = Math.max(0, getX() + width - textX - 2);
-                if (font().width(label) > maxTw && maxTw > 0) {
-                    int budget = Math.max(0, maxTw - font().width("…"));
-                    label = budget <= 0 ? "…" : font().plainSubstrByWidth(label, budget) + "…";
-                }
-                if (maxTw > 0 && !label.isEmpty()) {
-                    gfx.text(font(), Component.literal(label), textX, getY() + textY(height),
+                int pad = 2;
+                int need = UiTheme.ICON_SLOT + 3 + font().width(label);
+                boolean showText = need <= width - pad;
+
+                if (showText) {
+                    icon.drawInBox(gfx, getX() + pad, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX,
+                            active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED);
+                    gfx.text(font(), Component.literal(label),
+                            getX() + UiTheme.ICON_SLOT + pad + 1,
+                            getY() + textY(height),
                             active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED, false);
+                } else {
+                    // Узкая вкладка — только иконка по центру, без «Кома…»
+                    int ix = getX() + (width - UiTheme.ICON_SLOT) / 2;
+                    icon.drawInBox(gfx, ix, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX,
+                            active ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED);
                 }
-                if (active) gfx.fill(getX(), getY() + height - 1, getX() + width, getY() + height, UiTheme.ACCENT);
+
+                if (active) {
+                    gfx.fill(getX(), getY() + height - 2, getX() + width, getY() + height, UiTheme.ACCENT);
+                }
             }
         };
+        btn.setTooltip(Tooltip.create(text));
+        return btn;
     }
 
     /** Строка: иконка слева + текст (компактная, без лишней высоты). */
@@ -125,8 +141,16 @@ public final class LavaWidgets {
                 int bg = isHovered() ? UiTheme.ROW_HOVER : UiTheme.BTN_SECONDARY_BG;
                 gfx.fill(getX(), getY(), getX() + width, getY() + height, bg);
                 icon.drawInBox(gfx, getX() + 2, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX, UiTheme.TEXT_PRIMARY);
-                gfx.text(font(), getMessage(), getX() + UiTheme.ICON_SLOT + 3, getY() + textY(height),
-                        UiTheme.TEXT_PRIMARY, false);
+                String label = getMessage().getString();
+                int textX = getX() + UiTheme.ICON_SLOT + 4;
+                int maxTw = Math.max(0, getX() + width - textX - 4);
+                if (font().width(label) > maxTw && maxTw > 8) {
+                    label = font().plainSubstrByWidth(label, Math.max(0, maxTw - font().width("…"))) + "…";
+                }
+                if (maxTw > 0 && !label.isEmpty()) {
+                    gfx.text(font(), Component.literal(label), textX, getY() + textY(height),
+                            UiTheme.TEXT_PRIMARY, false);
+                }
             }
         };
     }

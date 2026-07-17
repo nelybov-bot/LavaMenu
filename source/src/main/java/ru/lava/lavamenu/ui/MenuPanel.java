@@ -9,8 +9,8 @@ public final class MenuPanel {
     private MenuPanel() {}
 
     public static void layout(int screenW, int screenH, int targetH, int[] box) {
-        int w = Math.min(UiTheme.PANEL_WIDTH, Math.max(280, screenW - 32));
-        int h = Math.min(targetH, Math.max(220, screenH - 32));
+        int w = Math.min(UiTheme.PANEL_WIDTH, Math.max(320, screenW - 40));
+        int h = Math.min(targetH, Math.max(240, screenH - 40));
         box[0] = (screenW - w) / 2;
         box[1] = (screenH - h) / 2;
         box[2] = w;
@@ -26,7 +26,7 @@ public final class MenuPanel {
         gfx.fill(x, y, x + w, y + h, UiTheme.PANEL_BG);
         gfx.fill(x, y, x + w, y + 2, UiTheme.ACCENT);
         gfx.fill(x, y + 2, x + w, y + 2 + UiTheme.HEADER_H, UiTheme.HEADER_BG);
-        gfx.text(font, title, x + 8, y + 5, UiTheme.TEXT_PRIMARY, false);
+        gfx.text(font, title, x + UiTheme.PAD, y + 6, UiTheme.TEXT_PRIMARY, false);
     }
 
     public static void drawSection(GuiGraphicsExtractor gfx, Font font, Component label, int x, int y) {

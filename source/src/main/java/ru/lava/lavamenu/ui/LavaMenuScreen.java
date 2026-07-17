@@ -231,27 +231,21 @@ public final class LavaMenuScreen extends Screen {
         }
         MenuPanel.layout(width, height, panelH(), box);
         int tabY = box[1] + UiTheme.TAB_Y;
-        int gap = 2;
+        int gap = 3;
         boolean showNotebook = NotebookAccess.canView();
         int tabCount = showNotebook ? 6 : 5;
         int tabW = (innerW() - gap * (tabCount - 1)) / tabCount;
-        int tx = innerX();
-        int i = 0;
+        int rem = innerW() - (tabW * tabCount + gap * (tabCount - 1));
+        int x = innerX();
 
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.MAP_PIN,
-                Component.translatable("lavamenu.tab.homes"), tab == Tab.HOMES, () -> selectTab(Tab.HOMES)));
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.TERMINAL,
-                Component.translatable("lavamenu.tab.commands"), tab == Tab.COMMANDS, () -> selectTab(Tab.COMMANDS)));
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.USERS,
-                Component.translatable("lavamenu.tab.friends"), tab == Tab.FRIENDS, () -> selectTab(Tab.FRIENDS)));
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.SEND,
-                Component.translatable("lavamenu.tab.chats"), tab == Tab.CHATS, () -> selectTab(Tab.CHATS)));
+        x = addMainTab(x, tabY, tabW, gap, GuiIcons.MAP_PIN, "lavamenu.tab.homes", Tab.HOMES);
+        x = addMainTab(x, tabY, tabW, gap, GuiIcons.TERMINAL, "lavamenu.tab.commands", Tab.COMMANDS);
+        x = addMainTab(x, tabY, tabW, gap, GuiIcons.USERS, "lavamenu.tab.friends", Tab.FRIENDS);
+        x = addMainTab(x, tabY, tabW, gap, GuiIcons.SEND, "lavamenu.tab.chats", Tab.CHATS);
         if (showNotebook) {
-            addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i++, tabY, tabW, UiTheme.TAB_H, GuiIcons.EDIT,
-                    Component.translatable("lavamenu.tab.notebook"), tab == Tab.NOTEBOOK, () -> selectTab(Tab.NOTEBOOK)));
+            x = addMainTab(x, tabY, tabW, gap, GuiIcons.EDIT, "lavamenu.tab.notebook", Tab.NOTEBOOK);
         }
-        addRenderableWidget(LavaWidgets.tab(tx + (tabW + gap) * i, tabY, tabW, UiTheme.TAB_H, GuiIcons.SETTINGS,
-                Component.translatable("lavamenu.tab.settings"), tab == Tab.SETTINGS, () -> selectTab(Tab.SETTINGS)));
+        addMainTab(x, tabY, tabW + rem, 0, GuiIcons.SETTINGS, "lavamenu.tab.settings", Tab.SETTINGS);
 
         switch (tab) {
             case HOMES -> initHomes();
@@ -261,6 +255,12 @@ public final class LavaMenuScreen extends Screen {
             case NOTEBOOK -> initNotebook();
             case SETTINGS -> initSettings();
         }
+    }
+
+    private int addMainTab(int x, int y, int w, int gapAfter, GuiIcons icon, String langKey, Tab target) {
+        addRenderableWidget(LavaWidgets.tab(x, y, w, UiTheme.TAB_H, icon,
+                Component.translatable(langKey), tab == target, () -> selectTab(target)));
+        return x + w + gapAfter;
     }
 
     // ==================== HOMES ====================

@@ -5,10 +5,8 @@
 .vscode/
 .cursor/
 
-# Local / agent-only docs (not published)
-docs/AI_CONTEXT.md
-docs/SESSION.md
-docs/TASKS.md
+# Local project docs (not published to GitHub)
+docs/
 
 # Neighbor modpack JARs (huge, not part of this mod)
 mods/**

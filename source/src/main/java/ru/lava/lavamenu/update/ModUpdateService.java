@@ -159,10 +159,13 @@ public final class ModUpdateService {
                 int cmp = compareVersions(info.version, currentVersion());
                 if (cmp > 0 && info.jarUrl != null && !info.jarUrl.isBlank()) {
                     status = Status.UPDATE_AVAILABLE;
-                    if (fromButton) {
-                        Minecraft.getInstance().execute(() ->
-                                UiFeedback.actionBar(Component.translatable("lavamenu.update.available", info.version)));
-                    }
+                    final String ver = info.version;
+                    Minecraft.getInstance().execute(() -> {
+                        UpdateToastService.show(ver);
+                        if (fromButton) {
+                            UiFeedback.actionBar(Component.translatable("lavamenu.update.available", ver));
+                        }
+                    });
                 } else {
                     status = Status.UP_TO_DATE;
                     if (fromButton) {

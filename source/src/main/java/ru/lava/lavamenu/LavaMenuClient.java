@@ -17,6 +17,7 @@ import ru.lava.lavamenu.input.KeyBindings;
 import ru.lava.lavamenu.notebook.AstoriaNotebookStore;
 import ru.lava.lavamenu.notebook.NotebookShare;
 import ru.lava.lavamenu.update.ModUpdateService;
+import ru.lava.lavamenu.update.UpdateToastService;
 import ru.lava.lavamenu.util.AnimationHelper;
 import ru.lava.lavamenu.util.FaceCache;
 import ru.lava.lavamenu.util.PvpStatus;
@@ -44,6 +45,7 @@ public final class LavaMenuClient implements ClientModInitializer {
         HomesChatListener.register();
         PmChatListener.register();
         ChatToastService.registerHud();
+        UpdateToastService.registerHud();
         AnimationHelper.register();
         ModUpdateService.get().cleanupPendingDeletes();
 
@@ -81,6 +83,7 @@ public final class LavaMenuClient implements ClientModInitializer {
             HomeRenameSession.tick();
             NotebookShare.tick();
             ChatToastService.tick();
+            UpdateToastService.tick();
             FaceCache.get().tick();
 
             while (KeyBindings.OPEN_MAIN.consumeClick()) {

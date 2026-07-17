@@ -1,6 +1,7 @@
 {
   "key.lavamenu.open_main": "Открыть меню Lava",
   "key.lavamenu.open_radial": "Открыть быстрое меню Lava",
+  "key.lavamenu.toast_reply": "Открыть уведомление (ЛС / обновление)",
   "category.lavamenu": "Lava Menu",
 
   "lavamenu.title": "Lava Menu",
@@ -91,7 +92,7 @@
   "lavamenu.chats.notify_sound.pop": "Click",
   "lavamenu.chats.notify_sound.off": "Без звука",
   "lavamenu.chats.toast_title": "Новое ЛС",
-  "lavamenu.chats.toast_hint": "Клик — ответить",
+  "lavamenu.chats.toast_hint": "[%s] — ответить",
 
   "lavamenu.anim.sit": "Сесть",
   "lavamenu.anim.lay": "Лечь",
@@ -146,6 +147,10 @@
   "lavamenu.update.busy": "§7Уже выполняется…",
   "lavamenu.update.check": "Проверить",
   "lavamenu.update.install": "Обновить",
+  "lavamenu.update.toast_title": "Доступно обновление!",
+  "lavamenu.update.toast_body": "Обнови в настройках ♥",
+  "lavamenu.update.toast_hint": "[%s] — открыть настройки",
+  "lavamenu.update.toast_hint_ver": "[%s] · v%s",
   "lavamenu.radial.slots_title": "Кнопки на G:",
   "lavamenu.radial.slots_hint": "слева — вкл/выкл, строка — действие",
   "lavamenu.radial.pick": "Выберите действие",

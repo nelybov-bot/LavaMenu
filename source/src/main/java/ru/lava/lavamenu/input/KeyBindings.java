@@ -14,6 +14,8 @@ import java.lang.reflect.Method;
 public final class KeyBindings {
     public static KeyMapping OPEN_MAIN;
     public static KeyMapping OPEN_RADIAL;
+    /** Открыть тост ЛС / тост обновления (когда мышь занята игрой). */
+    public static KeyMapping OPEN_REPLY;
     private static final KeyMapping.Category CATEGORY =
             KeyMapping.Category.register(Identifier.fromNamespaceAndPath(LavaMenuClient.MOD_ID, "category"));
 
@@ -32,6 +34,11 @@ public final class KeyBindings {
         OPEN_RADIAL = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.lavamenu.open_radial",
                 GLFW.GLFW_KEY_G,
+                CATEGORY
+        ));
+        OPEN_REPLY = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.lavamenu.toast_reply",
+                GLFW.GLFW_KEY_Y,
                 CATEGORY
         ));
     }

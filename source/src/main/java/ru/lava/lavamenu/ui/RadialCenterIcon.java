@@ -82,13 +82,19 @@ public final class RadialCenterIcon {
         }
     }
 
+    /** Рисует иконку в квадрате [x,y] размера size (для тостов и т.п.). */
+    public static void drawAt(GuiGraphicsExtractor gfx, Minecraft mc, int x, int y, int size) {
+        refresh(mc);
+        gfx.blit(RenderPipelines.GUI_TEXTURED, current,
+                x, y, 0, 0,
+                size, size, texW, texH, texW, texH);
+    }
+
     public static void draw(GuiGraphicsExtractor gfx, Minecraft mc, int cx, int cy, int size) {
         refresh(mc);
         int half = size / 2;
         int pad = 2;
         gfx.fill(cx - half - pad, cy - half - pad, cx + half + pad, cy + half + pad, 0xE0181818);
-        gfx.blit(RenderPipelines.GUI_TEXTURED, current,
-                cx - half, cy - half, 0, 0,
-                size, size, texW, texH, texW, texH);
+        drawAt(gfx, mc, cx - half, cy - half, size);
     }
 }

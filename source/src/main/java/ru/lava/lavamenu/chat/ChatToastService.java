@@ -3,23 +3,25 @@ package ru.lava.lavamenu.chat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import ru.lava.lavamenu.LavaMenuClient;
 import ru.lava.lavamenu.config.LavaMenuConfig;
+import ru.lava.lavamenu.input.KeyBindings;
 import ru.lava.lavamenu.ui.ChatToastScreen;
 import ru.lava.lavamenu.ui.UiTheme;
 import ru.lava.lavamenu.util.PlayerFaces;
 
 /**
  * HUD-тост входящих ЛС (без затемнения / без блокировки движения).
- * Клик → {@link ChatToastScreen} с полем ответа.
+ * Открыть: ЛКМ по тосту или клавиша {@link KeyBindings#OPEN_REPLY} (по умолчанию Y).
  */
 public final class ChatToastService {
     public static final int TOAST_W = 220;
     public static final int TOAST_H = 52;
     public static final int MARGIN = 8;
-    private static final long VISIBLE_MS = 10_000L;
+    private static final long VISIBLE_MS = 12_000L;
 
     private static String nick = "";
     private static String text = "";
@@ -47,8 +49,7 @@ public final class ChatToastService {
             return;
         }
 
-        String key = fromNick.trim();
-        nick = key;
+        nick = fromNick.trim();
         text = message.trim();
         untilMs = System.currentTimeMillis() + VISIBLE_MS;
         LavaMenuConfig.get().chatsNotifySound.play();
@@ -57,9 +58,6 @@ public final class ChatToastService {
     public static boolean isVisible() {
         return untilMs > System.currentTimeMillis() && !nick.isBlank();
     }
-
-    public static String nick() { return nick; }
-    public static String text() { return text; }
 
     public static void dismiss() {
         untilMs = 0L;
@@ -72,6 +70,12 @@ public final class ChatToastService {
             dismiss();
         }
         handleClick();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen == null && isVisible() && KeyBindings.OPEN_REPLY != null) {
+            while (KeyBindings.OPEN_REPLY.consumeClick()) {
+                openReply();
+            }
+        }
     }
 
     public static int toastX(int screenW) {
@@ -79,7 +83,7 @@ public final class ChatToastService {
     }
 
     public static int toastY(int screenH) {
-        return screenH - TOAST_H - MARGIN - 22; // над хотбаром
+        return screenH - TOAST_H - MARGIN - 22;
     }
 
     public static boolean hit(double mouseX, double mouseY, int screenW, int screenH) {
@@ -102,16 +106,20 @@ public final class ChatToastService {
             leftWasDown = mc.mouseHandler.isLeftPressed();
             return;
         }
-        boolean down = mc.mouseHandler.isLeftPressed();
-        boolean edge = down && !leftWasDown;
-        leftWasDown = down;
-        if (!edge || !isVisible()) return;
-
-        var win = mc.getWindow();
-        double mx = mc.mouseHandler.getScaledXPos(win);
-        double my = mc.mouseHandler.getScaledYPos(win);
-        if (hit(mx, my, win.getGuiScaledWidth(), win.getGuiScaledHeight())) {
-            openReply();
+        // В игре мышь захвачена — клик почти не попадает в HUD; основной способ — клавиша Y
+        if (!mc.mouseHandler.isMouseGrabbed()) {
+            boolean down = mc.mouseHandler.isLeftPressed();
+            boolean edge = down && !leftWasDown;
+            leftWasDown = down;
+            if (!edge || !isVisible()) return;
+            var win = mc.getWindow();
+            double mx = mc.mouseHandler.getScaledXPos(win);
+            double my = mc.mouseHandler.getScaledYPos(win);
+            if (hit(mx, my, win.getGuiScaledWidth(), win.getGuiScaledHeight())) {
+                openReply();
+            }
+        } else {
+            leftWasDown = false;
         }
     }
 
@@ -124,7 +132,6 @@ public final class ChatToastService {
         drawPanel(gfx, mc.font, nick, text, toastX(sw), toastY(sh), false);
     }
 
-    /** Общая отрисовка панели (HUD и экран ответа). */
     public static void drawPanel(GuiGraphicsExtractor gfx, Font font, String from, String preview,
                                  int x, int y, boolean replyMode) {
         int h = replyMode ? ChatToastScreen.PANEL_H : TOAST_H;
@@ -134,7 +141,7 @@ public final class ChatToastService {
         int face = 20;
         PlayerFaces.draw(gfx, font, from, x + 6, y + 6, face);
         String title = from == null ? "" : from;
-        gfx.text(font, net.minecraft.network.chat.Component.literal(title),
+        gfx.text(font, Component.literal(title),
                 x + 30, y + 6, UiTheme.TEXT_PRIMARY, false);
 
         String body = preview == null ? "" : preview;
@@ -142,11 +149,14 @@ public final class ChatToastService {
         if (font.width(body) > maxW) {
             body = font.plainSubstrByWidth(body, maxW - font.width("…")) + "…";
         }
-        gfx.text(font, net.minecraft.network.chat.Component.literal(body),
+        gfx.text(font, Component.literal(body),
                 x + 30, y + 18, UiTheme.TEXT_MUTED, false);
 
         if (!replyMode) {
-            gfx.text(font, net.minecraft.network.chat.Component.translatable("lavamenu.chats.toast_hint"),
+            String keyName = KeyBindings.OPEN_REPLY == null
+                    ? "Y"
+                    : KeyBindings.OPEN_REPLY.getTranslatedKeyMessage().getString();
+            gfx.text(font, Component.translatable("lavamenu.chats.toast_hint", keyName),
                     x + 30, y + 34, UiTheme.TEXT_DIM, false);
         }
     }

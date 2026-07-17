@@ -188,14 +188,16 @@ public final class LavaMenuScreen extends Screen {
     private int chatsListBottom() { return innerBottom(); }
     private static int chatStep() { return CHAT_ROW_H + UiTheme.ROW_GAP; }
 
-    // NOTEBOOK
-    private int notebookAddY() { return innerY() + 10; }
+    // NOTEBOOK: заголовок сверху, форма/подзаголовок, потом список
+    private int notebookTitleY() { return innerY() + 2; }
+    private int notebookAddY() { return notebookTitleY() + 14; }
     private int notebookShowY() { return notebookAddY() + step(); }
     private int notebookFormBottom() {
         if (NotebookAccess.canEdit()) return notebookShowY() + UiTheme.FIELD_H;
-        return innerY() + 22;
+        // зритель: заголовок + строка «от …»
+        return notebookTitleY() + 24;
     }
-    private int notebookListTop() { return notebookFormBottom() + 14; }
+    private int notebookListTop() { return notebookFormBottom() + 10; }
     private int notebookListBottom() { return innerBottom(); }
     private static int notebookStep() { return NOTEBOOK_ROW_H + UiTheme.ROW_GAP; }
 
@@ -972,20 +974,24 @@ public final class LavaMenuScreen extends Screen {
 
     private void drawNotebookOverlay(GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
         int x = innerX(), w = innerW();
-        MenuPanel.drawScrollCap(gfx, x, innerY(), w, notebookFormBottom() - innerY());
-        MenuPanel.drawDivider(gfx, x, notebookListTop() - 3, w);
+        MenuPanel.drawScrollCap(gfx, x, innerY(), w, Math.max(0, notebookListTop() - 4 - innerY()));
+
+        // Заголовок — всегда сверху, яркий, не пересекается с полями
         gfx.text(font, Component.translatable("lavamenu.notebook.title"),
-                x, notebookListTop() - 10, UiTheme.TEXT_PRIMARY, false);
+                x, notebookTitleY(), UiTheme.ACCENT, false);
+
         if (!NotebookAccess.canEdit()) {
             String from = AstoriaNotebookStore.get().sharedFrom();
-            if (from != null && !from.isBlank()) {
+            if (from != null && !from.isBlank() && !from.equals("?")) {
                 gfx.text(font, Component.translatable("lavamenu.notebook.from", from),
-                        x, notebookListTop() - 20, UiTheme.TEXT_DIM, false);
+                        x, notebookTitleY() + 12, UiTheme.TEXT_MUTED, false);
             } else {
                 gfx.text(font, Component.translatable("lavamenu.notebook.readonly_hint"),
-                        x, notebookListTop() - 20, UiTheme.TEXT_DIM, false);
+                        x, notebookTitleY() + 12, UiTheme.TEXT_MUTED, false);
             }
         }
+
+        MenuPanel.drawDivider(gfx, x, notebookListTop() - 5, w);
 
         List<NotebookEntry> list = AstoriaNotebookStore.get().entries();
         if (list.isEmpty()) {
@@ -998,7 +1004,7 @@ public final class LavaMenuScreen extends Screen {
                 emptyKey = "lavamenu.notebook.empty_shown";
             }
             gfx.text(font, Component.translatable(emptyKey),
-                    x, notebookListTop() + 2, UiTheme.TEXT_DIM, false);
+                    x, notebookListTop() + 4, UiTheme.TEXT_MUTED, false);
             return;
         }
 
@@ -1016,7 +1022,9 @@ public final class LavaMenuScreen extends Screen {
                     MenuPanel.drawRowHover(gfx, x, y, w - actionsW, NOTEBOOK_ROW_H);
                 }
                 PlayerFaces.draw(gfx, font, entry.nick, x + 1, y + (NOTEBOOK_ROW_H - 12) / 2, 12);
-                String reason = entry.reason.isBlank() ? "—" : entry.reason;
+                String reason = entry.reason.isBlank()
+                        ? Component.translatable("lavamenu.notebook.no_reason").getString()
+                        : entry.reason;
                 gfx.text(font, Component.literal(entry.nick), x + 18, y + 2, UiTheme.TEXT_PRIMARY, false);
                 gfx.text(font, Component.literal(ellipsize(reason, w - actionsW - 22)),
                         x + 18, y + 14, UiTheme.TEXT_MUTED, false);

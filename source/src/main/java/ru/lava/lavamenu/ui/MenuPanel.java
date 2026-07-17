@@ -9,7 +9,7 @@ public final class MenuPanel {
     private MenuPanel() {}
 
     public static void layout(int screenW, int screenH, int targetH, int[] box) {
-        int w = Math.min(UiTheme.PANEL_WIDTH, Math.max(320, screenW - 40));
+        int w = Math.min(UiTheme.PANEL_WIDTH, Math.max(300, screenW - 40));
         int h = Math.min(targetH, Math.max(240, screenH - 40));
         box[0] = (screenW - w) / 2;
         box[1] = (screenH - h) / 2;

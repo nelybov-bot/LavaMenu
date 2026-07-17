@@ -175,8 +175,8 @@ public final class LavaMenuScreen extends Screen {
     private int friendsListTop() { return friendsFormBottom() + 12; }
     private int friendsListBottom() { return innerBottom(); }
 
-    // COMMANDS
-    private int cmdServerY() { return innerY(); }
+    // COMMANDS: +11 под заголовок секции (не заезжает на вкладки)
+    private int cmdServerY() { return innerY() + 11; }
     private int cmdAnimY() { return cmdServerY() + step() * 2 + 10; }
     private int cmdTerritoryY() { return cmdAnimY() + step() + 10; }
     private int cmdPvpY() { return cmdTerritoryY() + step(); }
@@ -201,15 +201,15 @@ public final class LavaMenuScreen extends Screen {
     private int notebookListBottom() { return innerBottom(); }
     private static int notebookStep() { return NOTEBOOK_ROW_H + UiTheme.ROW_GAP; }
 
-    // SETTINGS: hold mode + hint + notify + sound, then update, then slots
-    private int settingsModeY() { return innerY() + 8; }
+    // SETTINGS: секция «Управление» на innerY, дальше без наезда на вкладки
+    private int settingsModeY() { return innerY() + 12; }
     private int settingsHintY() { return settingsModeY() + 14; }
     private int settingsNotifyY() { return settingsHintY() + 14; }
     private int settingsSoundY() { return settingsNotifyY() + 16; }
     private int settingsUpdateY() { return settingsSoundY() + 18; }
     private int settingsUpdateBtnY() { return settingsUpdateY() + 11; }
-    private int settingsSlotsTop() { return settingsUpdateBtnY() + UiTheme.ROW_H + 8; }
-    private int settingsSlotsListTop() { return settingsSlotsTop() + 12; }
+    private int settingsSlotsTop() { return settingsUpdateBtnY() + UiTheme.ROW_H + 14; }
+    private int settingsSlotsListTop() { return settingsSlotsTop() + 20; }
     private int settingsSlotsBottom() { return innerBottom(); }
 
     @Override
@@ -843,8 +843,18 @@ public final class LavaMenuScreen extends Screen {
         MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.cmd.section_territory"), x, cmdTerritoryY() - 9);
 
         GuiIcons.SHIELD.drawInBox(gfx, x, cmdTerritoryY(), UiTheme.ICON_BTN, UiTheme.TEXT_PRIMARY);
-        gfx.text(font, Component.translatable("lavamenu.cmd.area"), x + 18, cmdTerritoryY() + 4, UiTheme.TEXT_PRIMARY, false);
-        gfx.text(font, Component.translatable("lavamenu.cmd.area_wip"), x + w - 76, cmdTerritoryY() + 4, UiTheme.TEXT_MUTED, false);
+        Component area = Component.translatable("lavamenu.cmd.area");
+        gfx.text(font, area, x + 18, cmdTerritoryY() + 4, UiTheme.TEXT_PRIMARY, false);
+        String wip = Component.translatable("lavamenu.cmd.area_wip").getString();
+        int wipX = x + w - font.width(wip);
+        int areaEnd = x + 18 + font.width(area) + 8;
+        if (wipX < areaEnd) {
+            wip = ellipsize(wip, Math.max(0, x + w - areaEnd));
+            wipX = x + w - font.width(wip);
+        }
+        if (!wip.isEmpty() && wipX >= areaEnd) {
+            gfx.text(font, Component.literal(wip), wipX, cmdTerritoryY() + 4, UiTheme.TEXT_MUTED, false);
+        }
 
         GuiIcons.SWORD.drawInBox(gfx, x, cmdPvpY(), UiTheme.ICON_BTN, UiTheme.TEXT_PRIMARY);
         gfx.text(font, Component.translatable("lavamenu.cmd.pvp"), x + 18, cmdPvpY() + 4, UiTheme.TEXT_PRIMARY, false);
@@ -853,7 +863,13 @@ public final class LavaMenuScreen extends Screen {
                 ? Component.translatable("lavamenu.cmd.pvp_unknown")
                 : Component.translatable(tabPvp ? "lavamenu.cmd.pvp_on" : "lavamenu.cmd.pvp_off");
         int statusColor = tabPvp == null ? UiTheme.TEXT_DIM : (tabPvp ? UiTheme.ONLINE : UiTheme.OFFLINE);
-        gfx.text(font, status, x + 48, cmdPvpY() + 4, statusColor, false);
+        int pvpLabelEnd = x + 18 + font.width(Component.translatable("lavamenu.cmd.pvp")) + 6;
+        int toggleLeft = x + w - UiTheme.TOGGLE_W - 4;
+        int statusMax = Math.max(0, toggleLeft - pvpLabelEnd);
+        String statusStr = ellipsize(status.getString(), statusMax);
+        if (!statusStr.isEmpty()) {
+            gfx.text(font, Component.literal(statusStr), pvpLabelEnd, cmdPvpY() + 4, statusColor, false);
+        }
     }
 
     private void drawFriendsOverlay(GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
@@ -885,8 +901,10 @@ public final class LavaMenuScreen extends Screen {
                 LavaMenuConfig.FriendEntry fe = row.entry();
                 PlayerFaces.draw(gfx, font, fe.nick, x + 1, y + (UiTheme.ROW_H - face) / 2, face);
                 int textColor = row.online() ? UiTheme.TEXT_PRIMARY : UiTheme.TEXT_MUTED;
-                gfx.text(font, Component.literal(fe.label + " · " + fe.nick),
-                        x + 1 + face + 4, y + 4, textColor, false);
+                int textX = x + 1 + face + 4;
+                int textMax = Math.max(0, x + w - 68 - textX - 2);
+                gfx.text(font, Component.literal(ellipsize(fe.label + " · " + fe.nick, textMax)),
+                        textX, y + 4, textColor, false);
                 y += step();
             }
         });
@@ -977,7 +995,8 @@ public final class LavaMenuScreen extends Screen {
         MenuPanel.drawScrollCap(gfx, x, innerY(), w, Math.max(0, notebookListTop() - 4 - innerY()));
 
         // Заголовок — всегда сверху, яркий, не пересекается с полями
-        gfx.text(font, Component.translatable("lavamenu.notebook.title"),
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.notebook.title").getString(), w)),
                 x, notebookTitleY(), UiTheme.ACCENT, false);
 
         if (!NotebookAccess.canEdit()) {
@@ -1036,16 +1055,28 @@ public final class LavaMenuScreen extends Screen {
     private void drawSettingsOverlay(GuiGraphicsExtractor gfx) {
         int x = innerX(), py = innerY(), w = innerW();
         MenuPanel.drawScrollCap(gfx, x, innerY(), w, settingsSlotsTop() - innerY());
-        MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.settings.section_keys"), x, py - 9);
-        gfx.text(font, Component.translatable("lavamenu.radial.mode_label"), x, settingsModeY() + 2, UiTheme.TEXT_PRIMARY, false);
-        gfx.text(font, Component.translatable("lavamenu.radial.controls_hint"), x, settingsHintY(), UiTheme.TEXT_DIM, false);
-        gfx.text(font, Component.translatable("lavamenu.chats.notify"), x, settingsNotifyY() + 2, UiTheme.TEXT_PRIMARY, false);
-        gfx.text(font, Component.translatable("lavamenu.chats.notify_sound"), x, settingsSoundY() + 2, UiTheme.TEXT_PRIMARY, false);
-        gfx.text(font, ModUpdateService.get().statusLabel(), x, settingsUpdateY(),
+        MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.settings.section_keys"), x, py);
+        int togglePad = UiTheme.TOGGLE_W + 6;
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.radial.mode_label").getString(), w - togglePad)),
+                x, settingsModeY() + 2, UiTheme.TEXT_PRIMARY, false);
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.radial.controls_hint").getString(), w)),
+                x, settingsHintY(), UiTheme.TEXT_DIM, false);
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.chats.notify").getString(), w - togglePad)),
+                x, settingsNotifyY() + 2, UiTheme.TEXT_PRIMARY, false);
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.chats.notify_sound").getString(), w - 92)),
+                x, settingsSoundY() + 2, UiTheme.TEXT_PRIMARY, false);
+        // статус обновления — не залезает на кнопки справа (их нет в этой строке), но обрезаем по ширине
+        String updLabel = ModUpdateService.get().statusLabel().getString();
+        gfx.text(font, Component.literal(ellipsize(updLabel, w)), x, settingsUpdateY(),
                 ModUpdateService.get().updateAvailable() || ModUpdateService.get().needsRestart()
                         ? UiTheme.WORLD_GREEN : UiTheme.TEXT_DIM, false);
-        MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.radial.slots_title"), x, settingsSlotsTop() - 9);
-        gfx.text(font, Component.translatable("lavamenu.radial.slots_hint"), x, settingsSlotsTop(), UiTheme.TEXT_DIM, false);
+        MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.radial.slots_title"), x, settingsSlotsTop());
+        gfx.text(font, Component.translatable("lavamenu.radial.slots_hint"),
+                x, settingsSlotsTop() + 10, UiTheme.TEXT_DIM, false);
     }
 
     @Override

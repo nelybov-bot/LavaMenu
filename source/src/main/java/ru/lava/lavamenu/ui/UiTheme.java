@@ -23,9 +23,9 @@ public final class UiTheme {
     public static final int OFFLINE = 0xFF666666;
     public static final int BACKDROP = 0x90000000;
 
-    public static final int PAD = 10;
-    public static final int PANEL_WIDTH = 420;
-    public static final int PANEL_HEIGHT = 300;
+    public static final int PAD = 8;
+    public static final int PANEL_WIDTH = 360;
+    public static final int PANEL_HEIGHT = 290;
 
     public static final int HEADER_H = 18;
     public static final int TAB_Y = 20;

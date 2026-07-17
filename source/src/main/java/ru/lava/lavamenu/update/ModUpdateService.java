@@ -6,11 +6,15 @@ import net.minecraft.network.chat.Component;
 import ru.lava.lavamenu.LavaMenuClient;
 import ru.lava.lavamenu.util.UiFeedback;
 
+import javax.net.ssl.SSLException;
 import java.io.InputStream;
+import java.net.ConnectException;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +23,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
@@ -34,13 +39,21 @@ public final class ModUpdateService {
     public static final String GITHUB_REPO = "LavaMenu";
     private static final String API_LATEST =
             "https://api.github.com/repos/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/releases/latest";
+    private static final String WEB_LATEST =
+            "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/releases/latest";
     private static final long CHECK_INTERVAL_MS = 60L * 60L * 1000L;
     private static final Pattern TAG_VERSION = Pattern.compile("(\\d+(?:\\.\\d+){0,3})");
+    private static final Pattern TAG_IN_URL = Pattern.compile("/releases/tag/([^/?#\\s]+)");
 
     private static final ModUpdateService INSTANCE = new ModUpdateService();
     private static final HttpClient HTTP = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(12))
+            .connectTimeout(Duration.ofSeconds(15))
             .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+    /** Без авто-редиректа — читаем Location у /releases/latest. */
+    private static final HttpClient HTTP_NO_REDIRECT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(15))
+            .followRedirects(HttpClient.Redirect.NEVER)
             .build();
 
     private final AtomicBoolean busy = new AtomicBoolean(false);
@@ -99,6 +112,10 @@ public final class ModUpdateService {
                     statusDetail == null || statusDetail.isBlank() ? "…" : statusDetail);
             default -> Component.translatable("lavamenu.update.idle", currentVersion());
         };
+    }
+
+    private static String userAgent() {
+        return "LavaMenu/" + currentVersion() + " (+https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + ")";
     }
 
     public static String currentVersion() {
@@ -176,7 +193,7 @@ public final class ModUpdateService {
             } catch (Exception e) {
                 status = Status.ERROR;
                 statusDetail = shortError(e);
-                LavaMenuClient.LOGGER.warn("Update check failed: {}", statusDetail);
+                LavaMenuClient.LOGGER.warn("Update check failed: {}", statusDetail, e);
                 if (fromButton) {
                     Minecraft.getInstance().execute(() ->
                             UiFeedback.actionBar(Component.translatable("lavamenu.update.error", statusDetail)));
@@ -218,7 +235,7 @@ public final class ModUpdateService {
             } catch (Exception e) {
                 status = Status.ERROR;
                 statusDetail = shortError(e);
-                LavaMenuClient.LOGGER.warn("Update install failed: {}", statusDetail);
+                LavaMenuClient.LOGGER.warn("Update install failed: {}", statusDetail, e);
                 Minecraft.getInstance().execute(() ->
                         UiFeedback.actionBar(Component.translatable("lavamenu.update.error", statusDetail)));
             } finally {
@@ -235,19 +252,7 @@ public final class ModUpdateService {
         Path target = modsDir.resolve("lavamenu-" + safeVer + ".jar");
         Path part = modsDir.resolve("lavamenu-" + safeVer + ".jar.part");
 
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofMinutes(2))
-                .header("User-Agent", "LavaMenu-Updater")
-                .header("Accept", "application/octet-stream")
-                .GET()
-                .build();
-        HttpResponse<InputStream> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofInputStream());
-        if (resp.statusCode() / 100 != 2) {
-            throw new IllegalStateException("HTTP " + resp.statusCode());
-        }
-        try (InputStream in = resp.body()) {
-            Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
-        }
+        downloadTo(url, part);
         if (Files.size(part) < 1024) {
             Files.deleteIfExists(part);
             throw new IllegalStateException("файл слишком маленький");
@@ -263,7 +268,6 @@ public final class ModUpdateService {
                     })
                     .forEach(toDelete::add);
         }
-        // также текущий origin, если имя другое
         ownJarPath().ifPresent(own -> {
             if (!own.equals(target) && !toDelete.contains(own)) toDelete.add(own);
         });
@@ -281,7 +285,23 @@ public final class ModUpdateService {
         }
     }
 
-    private static java.util.Optional<Path> ownJarPath() {
+    private static void downloadTo(String url, Path part) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofMinutes(2))
+                .header("User-Agent", userAgent())
+                .header("Accept", "application/octet-stream,*/*")
+                .GET()
+                .build();
+        HttpResponse<InputStream> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofInputStream());
+        if (resp.statusCode() / 100 != 2) {
+            throw new IllegalStateException("скачивание HTTP " + resp.statusCode());
+        }
+        try (InputStream in = resp.body()) {
+            Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static Optional<Path> ownJarPath() {
         return FabricLoader.getInstance().getModContainer(LavaMenuClient.MOD_ID)
                 .flatMap(c -> c.getOrigin().getPaths().stream().findFirst());
     }
@@ -291,30 +311,94 @@ public final class ModUpdateService {
     }
 
     private ReleaseInfo fetchLatest() throws Exception {
+        Exception apiErr = null;
+        try {
+            return fetchLatestApi();
+        } catch (Exception e) {
+            apiErr = e;
+            LavaMenuClient.LOGGER.warn("GitHub API update check failed, trying web fallback: {}", e.toString());
+        }
+        try {
+            return fetchLatestWebRedirect();
+        } catch (Exception webErr) {
+            LavaMenuClient.LOGGER.warn("GitHub web fallback failed: {}", webErr.toString());
+            if (apiErr != null) {
+                webErr.addSuppressed(apiErr);
+            }
+            throw webErr;
+        }
+    }
+
+    private ReleaseInfo fetchLatestApi() throws Exception {
         HttpRequest req = HttpRequest.newBuilder(URI.create(API_LATEST))
-                .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "LavaMenu-Updater")
+                .timeout(Duration.ofSeconds(25))
+                .header("User-Agent", userAgent())
                 .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", "2022-11-28")
                 .GET()
                 .build();
         HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         if (resp.statusCode() == 404) {
             throw new IllegalStateException("релизов нет");
         }
+        if (resp.statusCode() == 403 || resp.statusCode() == 429) {
+            throw new IllegalStateException("лимит GitHub " + resp.statusCode());
+        }
         if (resp.statusCode() / 100 != 2) {
-            throw new IllegalStateException("HTTP " + resp.statusCode());
+            throw new IllegalStateException("API HTTP " + resp.statusCode());
         }
         String body = resp.body();
         String tag = jsonString(body, "tag_name");
         if (tag == null || tag.isBlank()) throw new IllegalStateException("нет tag_name");
         String version = normalizeVersion(tag);
         String jarUrl = findJarAssetUrl(body);
-        if (jarUrl == null) throw new IllegalStateException("в релизе нет .jar");
+        if (jarUrl == null) {
+            jarUrl = canonicalJarUrl(tag.startsWith("v") || tag.startsWith("V") ? tag : ("v" + version), version);
+        }
         return new ReleaseInfo(version, jarUrl);
     }
 
+    /**
+     * Запасной путь без api.github.com: Location у /releases/latest → tag → download URL.
+     * Часто работает, когда API режется антивирусом/DPI.
+     */
+    private ReleaseInfo fetchLatestWebRedirect() throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(WEB_LATEST))
+                .timeout(Duration.ofSeconds(25))
+                .header("User-Agent", userAgent())
+                .header("Accept", "text/html,application/xhtml+xml,*/*")
+                .GET()
+                .build();
+        HttpResponse<Void> resp = HTTP_NO_REDIRECT.send(req, HttpResponse.BodyHandlers.discarding());
+        int code = resp.statusCode();
+        Optional<String> loc = resp.headers().firstValue("location");
+        if (loc.isEmpty()) {
+            loc = resp.headers().firstValue("Location");
+        }
+        if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && loc.isPresent()) {
+            String location = loc.get();
+            Matcher m = TAG_IN_URL.matcher(location);
+            if (!m.find()) {
+                throw new IllegalStateException("нет тега в Location");
+            }
+            String tag = m.group(1);
+            String version = normalizeVersion(tag);
+            String tagPath = tag.startsWith("v") || tag.startsWith("V") ? tag : ("v" + version);
+            return new ReleaseInfo(version, canonicalJarUrl(tagPath, version));
+        }
+        // иногда уже 200 на странице тега после прокси
+        if (code / 100 == 2) {
+            throw new IllegalStateException("нет редиректа latest");
+        }
+        throw new IllegalStateException("web HTTP " + code);
+    }
+
+    private static String canonicalJarUrl(String tagPath, String version) {
+        return "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
+                + "/releases/download/" + tagPath + "/lavamenu-" + version + ".jar";
+    }
+
     private static String findJarAssetUrl(String releaseJson) {
-        // ищем browser_download_url у asset с .jar (предпочтительно lavamenu)
         Pattern asset = Pattern.compile(
                 "\"name\"\\s*:\\s*\"([^\"]+\\.jar)\"[\\s\\S]*?\"browser_download_url\"\\s*:\\s*\"([^\"]+)\"",
                 Pattern.CASE_INSENSITIVE);
@@ -326,7 +410,6 @@ public final class ModUpdateService {
             if (name.contains("lavamenu")) return url;
             if (fallback == null) fallback = url;
         }
-        // иногда порядок полей другой
         Pattern urlFirst = Pattern.compile(
                 "\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.jar)\"",
                 Pattern.CASE_INSENSITIVE);
@@ -376,10 +459,45 @@ public final class ModUpdateService {
     }
 
     private static String shortError(Exception e) {
-        String m = e.getMessage();
-        if (m == null || m.isBlank()) m = e.getClass().getSimpleName();
-        if (m.length() > 40) m = m.substring(0, 37) + "…";
+        Throwable t = e;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        if (t instanceof SSLException || nameHas(t, "SSL", "PKIX", "Certificate")) {
+            return "SSL/сеть (антивирус?)";
+        }
+        if (t instanceof UnknownHostException) {
+            return "нет DNS/сети";
+        }
+        if (t instanceof ConnectException) {
+            return "нет соединения";
+        }
+        if (t instanceof HttpTimeoutException || nameHas(t, "Timeout", "TimedOut")) {
+            return "таймаут";
+        }
+        String m = t.getMessage();
+        if (m == null || m.isBlank()) {
+            m = e.getMessage();
+        }
+        if (m == null || m.isBlank()) {
+            m = t.getClass().getSimpleName();
+        }
+        // не показываем сырой URL как «ошибка https://…»
+        if (m.toLowerCase(Locale.ROOT).startsWith("https://") || m.toLowerCase(Locale.ROOT).startsWith("http://")) {
+            return "сеть/HTTPS";
+        }
+        if (m.length() > 42) m = m.substring(0, 39) + "…";
         return m;
+    }
+
+    private static boolean nameHas(Throwable t, String... parts) {
+        String n = t.getClass().getName();
+        String m = t.getMessage() == null ? "" : t.getMessage();
+        String hay = n + " " + m;
+        for (String p : parts) {
+            if (hay.contains(p)) return true;
+        }
+        return false;
     }
 
     private record ReleaseInfo(String version, String jarUrl) {}

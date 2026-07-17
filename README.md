@@ -4,7 +4,7 @@
 
 ## Установка
 
-Скопируйте `release/lavamenu-0.1.1.jar` в `.minecraft/mods/`.
+Скопируйте `release/lavamenu-0.1.3.jar` в `.minecraft/mods/`.
 
 - Конфиг: `.minecraft/config/lavamenu.json`
 - Чаты: `.minecraft/config/lavamenu-chats.json`
@@ -21,7 +21,7 @@ export JAVA_HOME="/usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
 ./gradlew build
 ```
 
-Готовый JAR: `source/build/libs/lavamenu-0.1.1.jar`
+Готовый JAR: `source/build/libs/lavamenu-0.1.3.jar`
 
 ## Управление
 

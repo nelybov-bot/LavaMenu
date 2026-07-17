@@ -4,5 +4,6 @@
 Меню команд LavaWin: точки `/home`, AH, анимации, друзья, ЛС (Чаты), PvP, быстрое круговое меню (G).
 
 Исходники: `source/`  
-Готовый JAR: `release/lavamenu-0.1.0.jar`  
-Лицензия: `LICENSE` (MIT), автор mzrb.
+Готовый JAR: `release/lavamenu-0.1.1.jar`  
+Лицензия: `LICENSE` (MIT), автор mzrb.  
+Репозиторий: https://github.com/nelybov-bot/LavaMenu

@@ -16,3 +16,8 @@
 - Хранение: `ChatStore` → `config/lavamenu-chats.json` (без автоочистки; диалоги удаляет игрок).
 - UI: вкладка «Чаты» (список как Друзья: overlay + hitArea + головы) + `ChatConversationScreen`; отправка `/msg <ник> <текст>`.
 - Головы: `PlayerFaces` / `FaceCache` (`config/lavamenu/faces/`).
+
+### Обновления
+- `ModUpdateService`: GitHub Releases `nelybov-bot/LavaMenu`.
+- Раз в час фоновая проверка; в Настройках кнопки «Проверить» / «Обновить».
+- Скачивание JAR в `mods/`, старые `lavamenu*.jar` удаляются (или при следующем запуске); сообщение **«Перезапусти игру»**.

@@ -1,12 +1,12 @@
 package ru.lava.lavamenu.chat;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
-/** Пресеты звука уведомления ЛС. */
+/** Пресеты звука уведомления ЛС (UI-канал — слышно даже при тихих игроках). */
 public enum ChatNotifySound {
     CHIME("chime"),
     PLING("pling"),
@@ -40,8 +40,7 @@ public enum ChatNotifySound {
     public void play() {
         if (this == OFF) return;
         Minecraft mc = Minecraft.getInstance();
-        LocalPlayer player = mc.player;
-        if (player == null) return;
+        if (mc.getSoundManager() == null) return;
         SoundEvent ev = switch (this) {
             case CHIME -> SoundEvents.NOTE_BLOCK_CHIME.value();
             case PLING -> SoundEvents.NOTE_BLOCK_PLING.value();
@@ -50,8 +49,9 @@ public enum ChatNotifySound {
             case OFF -> null;
         };
         if (ev == null) return;
-        float vol = this == ORB ? 0.25f : 0.35f;
+        // forUI(event, pitch, volume) — канал SoundSource.UI
         float pitch = this == CHIME ? 1.15f : (this == PLING ? 1.35f : 1.0f);
-        player.playSound(ev, vol, pitch);
+        float volume = this == POP ? 0.9f : 1.0f;
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(ev, pitch, volume));
     }
 }

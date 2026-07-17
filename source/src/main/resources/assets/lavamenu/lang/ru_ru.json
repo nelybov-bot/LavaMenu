@@ -139,7 +139,7 @@
   "lavamenu.radial.mode_hold": "Режим: удерживать клавишу",
   "lavamenu.radial.mode_toggle": "Режим: нажать (переключатель)",
   "lavamenu.radial.reset": "Сбросить сектора",
-  "lavamenu.radial.controls_hint": "Клавиши меняются в настройках Minecraft",
+  "lavamenu.radial.controls_hint": "Клавиши: Minecraft → Управление → Lava Menu",
   "lavamenu.update.idle": "Версия %s",
   "lavamenu.update.checking": "Проверка обновлений…",
   "lavamenu.update.up_to_date": "Актуально · %s",

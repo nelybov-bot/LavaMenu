@@ -35,11 +35,11 @@ public final class ConfirmScreen extends Screen {
         addRenderableWidget(LavaWidgets.styled(cx - 105, btnY, 100, 22,
                 Component.translatable("lavamenu.confirm.yes"), LavaWidgets.BtnStyle.PRIMARY, () -> {
                     onConfirm.run();
-                    Minecraft.getInstance().setScreen(parent);
+                    Minecraft.getInstance().gui.setScreen(parent);
                 }));
         addRenderableWidget(LavaWidgets.styled(cx + 5, btnY, 100, 22,
                 Component.translatable("lavamenu.confirm.no"), LavaWidgets.BtnStyle.SECONDARY,
-                () -> Minecraft.getInstance().setScreen(parent)));
+                () -> Minecraft.getInstance().gui.setScreen(parent)));
     }
 
     @Override
@@ -51,7 +51,7 @@ public final class ConfirmScreen extends Screen {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
-            Minecraft.getInstance().setScreen(parent);
+            Minecraft.getInstance().gui.setScreen(parent);
             return true;
         }
         return super.keyPressed(event);

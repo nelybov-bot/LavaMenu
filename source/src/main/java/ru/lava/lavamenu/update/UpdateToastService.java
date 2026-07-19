@@ -56,7 +56,7 @@ public final class UpdateToastService {
         // Приоритет у тоста ЛС: если оба видны — Y открывает ответ, не настройки
         if (ChatToastService.isVisible()) return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen == null && isVisible() && KeyBindings.OPEN_REPLY != null) {
+        if (mc.gui.screen() == null && isVisible() && KeyBindings.OPEN_REPLY != null) {
             while (KeyBindings.OPEN_REPLY.consumeClick()) {
                 openSettings();
             }
@@ -77,12 +77,12 @@ public final class UpdateToastService {
 
     public static void openSettings() {
         dismiss();
-        Minecraft.getInstance().setScreen(new LavaMenuScreen(LavaMenuScreen.Tab.SETTINGS));
+        Minecraft.getInstance().gui.setScreen(new LavaMenuScreen(LavaMenuScreen.Tab.SETTINGS));
     }
 
     private static void handleClick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.screen != null) {
+        if (mc.player == null || mc.gui.screen() != null) {
             leftWasDown = mc.mouseHandler.isLeftPressed();
             return;
         }
@@ -107,7 +107,7 @@ public final class UpdateToastService {
 
     private static void renderHud(GuiGraphicsExtractor gfx) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen != null) return;
+        if (mc.gui.screen() != null) return;
         if (!isVisible()) return;
         int sw = mc.getWindow().getGuiScaledWidth();
         int sh = mc.getWindow().getGuiScaledHeight();

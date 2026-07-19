@@ -44,8 +44,8 @@ public final class LavaWidgets {
             @Override
             protected void extractContents(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float delta) {
                 int bg = switch (style) {
-                    case PRIMARY -> UiTheme.ACCENT;
-                    case DANGER -> UiTheme.DANGER_BG;
+                    case PRIMARY -> isHovered() ? 0xFF7BB4E0 : UiTheme.ACCENT;
+                    case DANGER -> isHovered() ? 0xFFD47A7A : UiTheme.DANGER_BG;
                     default -> isHovered() ? UiTheme.ROW_HOVER : UiTheme.BTN_SECONDARY_BG;
                 };
                 int fg = switch (style) {
@@ -53,8 +53,14 @@ public final class LavaWidgets {
                     case DANGER -> UiTheme.DANGER_TEXT;
                     default -> UiTheme.TEXT_PRIMARY;
                 };
-                gfx.fill(getX(), getY(), getX() + width, getY() + height, bg);
-                gfx.centeredText(font(), getMessage(), getX() + width / 2, getY() + textY(height), fg);
+                int x = getX(), y = getY();
+                if (style == BtnStyle.SECONDARY) {
+                    gfx.fill(x, y, x + width, y + height, UiTheme.BTN_SECONDARY_BORDER);
+                    gfx.fill(x + 1, y + 1, x + width - 1, y + height - 1, bg);
+                } else {
+                    gfx.fill(x, y, x + width, y + height, bg);
+                }
+                gfx.centeredText(font(), getMessage(), x + width / 2, y + textY(height), fg);
             }
         };
     }
@@ -98,6 +104,7 @@ public final class LavaWidgets {
             protected void extractContents(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float delta) {
                 if (active) {
                     gfx.fill(getX(), getY(), getX() + width, getY() + height, UiTheme.TAB_ACTIVE_BG);
+                    gfx.fill(getX(), getY(), getX() + width, getY() + 1, UiTheme.ACCENT_SOFT);
                 } else if (isHovered()) {
                     gfx.fill(getX(), getY(), getX() + width, getY() + height, UiTheme.ROW_HOVER);
                 }
@@ -155,16 +162,18 @@ public final class LavaWidgets {
             @Override
             protected void extractContents(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float delta) {
                 int bg = isHovered() ? UiTheme.ROW_HOVER : UiTheme.BTN_SECONDARY_BG;
-                gfx.fill(getX(), getY(), getX() + width, getY() + height, bg);
-                icon.drawInBox(gfx, getX() + 2, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX, UiTheme.TEXT_PRIMARY);
+                int x = getX(), y = getY();
+                gfx.fill(x, y, x + width, y + height, UiTheme.BTN_SECONDARY_BORDER);
+                gfx.fill(x + 1, y + 1, x + width - 1, y + height - 1, bg);
+                icon.drawInBox(gfx, x + 2, y, UiTheme.ICON_SLOT, UiTheme.ICON_PX, UiTheme.TEXT_PRIMARY);
                 String label = getMessage().getString();
-                int textX = getX() + UiTheme.ICON_SLOT + 4;
-                int maxTw = Math.max(0, getX() + width - textX - 4);
+                int textX = x + UiTheme.ICON_SLOT + 4;
+                int maxTw = Math.max(0, x + width - textX - 4);
                 if (font().width(label) > maxTw && maxTw > 8) {
                     label = font().plainSubstrByWidth(label, Math.max(0, maxTw - font().width("…"))) + "…";
                 }
                 if (maxTw > 0 && !label.isEmpty()) {
-                    gfx.text(font(), Component.literal(label), textX, getY() + textY(height),
+                    gfx.text(font(), Component.literal(label), textX, y + textY(height),
                             UiTheme.TEXT_PRIMARY, false);
                 }
             }
@@ -220,9 +229,15 @@ public final class LavaWidgets {
                 boolean hot = highlighted || isHovered();
                 int bg = hot ? UiTheme.ACCENT : UiTheme.BTN_SECONDARY_BG;
                 int fg = hot ? UiTheme.TEXT_DARK : UiTheme.TEXT_PRIMARY;
-                gfx.fill(getX(), getY(), getX() + width, getY() + height, bg);
-                icon.drawInBox(gfx, getX() + 1, getY(), UiTheme.ICON_SLOT, UiTheme.ICON_PX, fg);
-                gfx.text(font(), getMessage(), getX() + UiTheme.ICON_SLOT + 2, getY() + textY(height), fg, false);
+                int x = getX(), y = getY();
+                if (!hot) {
+                    gfx.fill(x, y, x + width, y + height, UiTheme.BTN_SECONDARY_BORDER);
+                    gfx.fill(x + 1, y + 1, x + width - 1, y + height - 1, bg);
+                } else {
+                    gfx.fill(x, y, x + width, y + height, bg);
+                }
+                icon.drawInBox(gfx, x + 1, y, UiTheme.ICON_SLOT, UiTheme.ICON_PX, fg);
+                gfx.text(font(), getMessage(), x + UiTheme.ICON_SLOT + 2, y + textY(height), fg, false);
             }
         };
     }
@@ -285,10 +300,14 @@ public final class LavaWidgets {
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float delta) {
             int track = on ? UiTheme.ACCENT : UiTheme.BTN_SECONDARY_BG;
-            int mid = getY() + height / 2;
-            gfx.fill(getX(), mid - 2, getX() + width, mid + 2, track);
-            int knobX = on ? getX() + width - 10 : getX() + 2;
-            gfx.fill(knobX, getY() + 1, knobX + 8, getY() + height - 1, UiTheme.TEXT_PRIMARY);
+            int x = getX(), y = getY();
+            gfx.fill(x, y + 2, x + width, y + height - 2, UiTheme.BTN_SECONDARY_BORDER);
+            gfx.fill(x + 1, y + 3, x + width - 1, y + height - 3, track);
+            int knobX = on ? x + width - 10 : x + 2;
+            gfx.fill(knobX, y + 1, knobX + 8, y + height - 1, UiTheme.TEXT_PRIMARY);
+            if (on) {
+                gfx.fill(knobX + 1, y + 2, knobX + 7, y + 3, UiTheme.ACCENT_SOFT);
+            }
         }
 
         @Override

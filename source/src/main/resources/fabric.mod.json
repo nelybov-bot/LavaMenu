@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "lavamenu",
   "version": "${version}",
-  "name": "${mod_name}",
-  "description": "${mod_description}",
+  "name": "Lava Menu",
+  "description": "Меню быстрых команд для сервера (AH, точки, анимации, чаты).",
   "authors": ["mzrb"],
   "license": "MIT",
   "environment": "client",
@@ -13,9 +13,8 @@
     ]
   },
   "depends": {
-    "fabricloader": ">=0.18",
+    "fabricloader": ">=0.19",
     "minecraft": "${mcdep}",
     "fabric-api": "*"
   }
 }
-

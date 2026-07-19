@@ -51,9 +51,9 @@ public final class LavaMenuClient implements ClientModInitializer {
 
         HomesData.get().setChangeListener(() -> {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.screen instanceof LavaMenuScreen screen) {
+            if (mc.gui.screen() instanceof LavaMenuScreen screen) {
                 mc.execute(screen::onHomesDataChanged);
-            } else if (mc.screen instanceof HomesQuickScreen quick) {
+            } else if (mc.gui.screen() instanceof HomesQuickScreen quick) {
                 mc.execute(quick::onHomesDataChanged);
             }
         });
@@ -61,9 +61,9 @@ public final class LavaMenuClient implements ClientModInitializer {
         ChatStore.get().setChangeListener(() -> {
             Minecraft mc = Minecraft.getInstance();
             mc.execute(() -> {
-                if (mc.screen instanceof LavaMenuScreen screen) {
+                if (mc.gui.screen() instanceof LavaMenuScreen screen) {
                     screen.onChatsChanged();
-                } else if (mc.screen instanceof ChatConversationScreen conv) {
+                } else if (mc.gui.screen() instanceof ChatConversationScreen conv) {
                     conv.onChatsChanged();
                 }
             });
@@ -72,7 +72,7 @@ public final class LavaMenuClient implements ClientModInitializer {
         AstoriaNotebookStore.get().setChangeListener(() -> {
             Minecraft mc = Minecraft.getInstance();
             mc.execute(() -> {
-                if (mc.screen instanceof LavaMenuScreen screen) {
+                if (mc.gui.screen() instanceof LavaMenuScreen screen) {
                     screen.onNotebookChanged();
                 }
             });
@@ -88,8 +88,8 @@ public final class LavaMenuClient implements ClientModInitializer {
 
             while (KeyBindings.OPEN_MAIN.consumeClick()) {
                 Minecraft mc = Minecraft.getInstance();
-                if (mc.screen == null) {
-                    mc.setScreen(new LavaMenuScreen());
+                if (mc.gui.screen() == null) {
+                    mc.gui.setScreen(new LavaMenuScreen());
                 }
             }
 
@@ -104,23 +104,23 @@ public final class LavaMenuClient implements ClientModInitializer {
 
             if (mode == LavaMenuConfig.RadialMode.TOGGLE) {
                 if (edge) {
-                    if (mc.screen instanceof RadialMenuScreen) {
-                        mc.setScreen(null);
-                    } else if (mc.screen == null) {
-                        mc.setScreen(new RadialMenuScreen());
+                    if (mc.gui.screen() instanceof RadialMenuScreen) {
+                        mc.gui.setScreen(null);
+                    } else if (mc.gui.screen() == null) {
+                        mc.gui.setScreen(new RadialMenuScreen());
                     }
                 }
                 radialSession = false;
             } else {
-                if (down && !radialSession && mc.screen == null) {
-                    mc.setScreen(new RadialMenuScreen());
+                if (down && !radialSession && mc.gui.screen() == null) {
+                    mc.gui.setScreen(new RadialMenuScreen());
                     radialSession = true;
                 } else if (radialSession) {
                     if (!down) {
-                        if (mc.screen instanceof RadialMenuScreen radial) {
+                        if (mc.gui.screen() instanceof RadialMenuScreen radial) {
                             radial.executeHoveredAndClose();
                         } else {
-                            mc.setScreen(null);
+                            mc.gui.setScreen(null);
                         }
                         radialSession = false;
                     }

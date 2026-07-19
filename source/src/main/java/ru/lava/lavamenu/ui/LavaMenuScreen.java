@@ -325,12 +325,12 @@ public final class LavaMenuScreen extends Screen {
         addRenderableWidget(LavaWidgets.styled(px + 18, y, ax - px - 20, UiTheme.ROW_H, Component.literal(label),
                 LavaWidgets.BtnStyle.SECONDARY, () -> teleportHome(name)));
         addRenderableWidget(LavaWidgets.icon(ax, y, GuiIcons.EDIT, () ->
-                Minecraft.getInstance().setScreen(new RenameEntryScreen(this,
+                Minecraft.getInstance().gui.setScreen(new RenameEntryScreen(this,
                         Component.translatable("lavamenu.homes.rename"),
                         Component.translatable("lavamenu.homes.rename_hint", name),
                         name, neu -> Minecraft.getInstance().execute(() -> promptRenameHome(name, neu))))));
         addRenderableWidget(LavaWidgets.icon(ax + 17, y, GuiIcons.TRASH, LavaWidgets.BtnStyle.DANGER, () ->
-                Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+                Minecraft.getInstance().gui.setScreen(new ConfirmScreen(this,
                         Component.translatable("lavamenu.confirm.title"),
                         Component.translatable("lavamenu.homes.delete_confirm", name),
                         () -> CommandHelper.sendFromUi("delhome " + name)))));
@@ -343,7 +343,7 @@ public final class LavaMenuScreen extends Screen {
     private void promptRenameHome(String oldName, String neu) {
         String name = neu == null ? "" : neu.trim();
         if (name.isEmpty() || name.equals(oldName)) return;
-        Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+        Minecraft.getInstance().gui.setScreen(new ConfirmScreen(this,
                 Component.translatable("lavamenu.confirm.title"),
                 Component.translatable("lavamenu.homes.rename_confirm", oldName, name),
                 340, 128,
@@ -413,15 +413,15 @@ public final class LavaMenuScreen extends Screen {
             addRenderableWidget(LavaWidgets.icon(bx + 17, y, GuiIcons.SEND, () -> {
                 ChatStore.get().getOrCreate(fe.nick);
                 ChatStore.get().save();
-                Minecraft.getInstance().setScreen(new ChatConversationScreen(this, fe.nick));
+                Minecraft.getInstance().gui.setScreen(new ChatConversationScreen(this, fe.nick));
             }));
             addRenderableWidget(LavaWidgets.icon(bx + 34, y, GuiIcons.EDIT, () ->
-                    Minecraft.getInstance().setScreen(new RenameEntryScreen(this,
+                    Minecraft.getInstance().gui.setScreen(new RenameEntryScreen(this,
                             Component.translatable("lavamenu.friends.rename"),
                             Component.translatable("lavamenu.friends.rename_hint", fe.label),
                             fe.label, neu -> { fe.label = neu; LavaMenuConfig.get().save(); }))));
             addRenderableWidget(LavaWidgets.icon(bx + 51, y, GuiIcons.TRASH, LavaWidgets.BtnStyle.DANGER, () ->
-                    Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+                    Minecraft.getInstance().gui.setScreen(new ConfirmScreen(this,
                             Component.translatable("lavamenu.confirm.title"),
                             Component.translatable("lavamenu.friends.delete_confirm", fe.label),
                             () -> {
@@ -464,10 +464,10 @@ public final class LavaMenuScreen extends Screen {
             int trashX = px + w - UiTheme.ICON_BTN;
             // Клик по строке (кроме корзины) → диалог. Текст рисует overlay.
             addRenderableWidget(LavaWidgets.hitArea(px, y, trashX - px - 2, CHAT_ROW_H,
-                    () -> Minecraft.getInstance().setScreen(new ChatConversationScreen(this, nick))));
+                    () -> Minecraft.getInstance().gui.setScreen(new ChatConversationScreen(this, nick))));
             addRenderableWidget(LavaWidgets.icon(trashX, y + (CHAT_ROW_H - UiTheme.ICON_BTN) / 2,
                     GuiIcons.TRASH, LavaWidgets.BtnStyle.DANGER, () ->
-                            Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+                            Minecraft.getInstance().gui.setScreen(new ConfirmScreen(this,
                                     Component.translatable("lavamenu.confirm.title"),
                                     Component.translatable("lavamenu.chats.delete_confirm", nick),
                                     () -> {
@@ -496,7 +496,7 @@ public final class LavaMenuScreen extends Screen {
         }
         ChatStore.get().getOrCreate(nick);
         ChatStore.get().save();
-        Minecraft.getInstance().setScreen(new ChatConversationScreen(this, nick));
+        Minecraft.getInstance().gui.setScreen(new ChatConversationScreen(this, nick));
     }
 
     // ==================== NOTEBOOK ====================
@@ -563,7 +563,7 @@ public final class LavaMenuScreen extends Screen {
             String nick = entry.nick;
             int bx = px + w - 34;
             addRenderableWidget(LavaWidgets.icon(bx, y + (NOTEBOOK_ROW_H - UiTheme.ICON_BTN) / 2, GuiIcons.EDIT, () ->
-                    Minecraft.getInstance().setScreen(new RenameEntryScreen(this,
+                    Minecraft.getInstance().gui.setScreen(new RenameEntryScreen(this,
                             Component.translatable("lavamenu.notebook.edit_reason"),
                             Component.translatable("lavamenu.notebook.reason_hint"),
                             entry.reason, neu -> {
@@ -572,7 +572,7 @@ public final class LavaMenuScreen extends Screen {
                             }))));
             addRenderableWidget(LavaWidgets.icon(bx + 17, y + (NOTEBOOK_ROW_H - UiTheme.ICON_BTN) / 2,
                     GuiIcons.TRASH, LavaWidgets.BtnStyle.DANGER, () ->
-                            Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+                            Minecraft.getInstance().gui.setScreen(new ConfirmScreen(this,
                                     Component.translatable("lavamenu.confirm.title"),
                                     Component.translatable("lavamenu.notebook.delete_confirm", nick),
                                     () -> {
@@ -584,7 +584,7 @@ public final class LavaMenuScreen extends Screen {
     }
 
     private void dismissNotebookView() {
-        Minecraft.getInstance().setScreen(new ConfirmScreen(this,
+        Minecraft.getInstance().gui.setScreen(new ConfirmScreen(this,
                 Component.translatable("lavamenu.confirm.title"),
                 Component.translatable("lavamenu.notebook.dismiss_confirm"),
                 () -> {

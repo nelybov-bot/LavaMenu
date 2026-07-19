@@ -1,6 +1,6 @@
 ## LavaMenu (Fabric, client-only)
 
-Клиентский мод быстрых команд LavaWin (MC 26.1.x).  
+Клиентский мод быстрых команд LavaWin (MC 26.2).  
 Канон проекта: родительская папка `~/Desktop/LavaMenu/` (здесь только Gradle-исходники).
 
 ### Управление
@@ -13,6 +13,6 @@
 export JAVA_HOME="/usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
 ./gradlew build
 ```
-JAR: `build/libs/lavamenu-0.1.0.jar`
+JAR: `build/libs/lavamenu-0.2.0.jar`
 
 Конфиг: `.minecraft/config/lavamenu.json`

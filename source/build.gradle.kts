@@ -1,68 +1,57 @@
 plugins {
-    id("dev.isxander.modstitch.base") version "0.8.4"
+    id("net.fabricmc.fabric-loom") version "1.17-SNAPSHOT"
     id("java")
 }
 
 fun prop(name: String): String =
     findProperty(name)?.toString() ?: throw IllegalArgumentException("Missing property: $name")
 
+version = prop("mod.version")
+group = prop("maven_group")
+base.archivesName.set(prop("mod.id"))
+
 repositories {
     mavenCentral()
     maven("https://maven.fabricmc.net/")
 }
 
-modstitch {
-    minecraftVersion = prop("deps.mc")
-
-    metadata {
-        modId = prop("mod.id")
-        modName = prop("mod.name")
-        modVersion = prop("mod.version")
-        modDescription = prop("mod.description")
-        modGroup = "ru.lava"
-        modAuthor = prop("mod.author")
-
-        replacementProperties.put("mcdep", prop("mod.mcdep"))
-    }
-
-    loom {
-        fabricLoaderVersion = prop("deps.fabric")
-        configureLoom {
-            // Оставляем дефолтные маппинги платформы (official/merged). Это влияет только на имена в исходниках,
-            // на запуск мода в лаунчерах НЕ влияет.
-        }
-    }
-}
-
 dependencies {
-    modstitchModImplementation("net.fabricmc:fabric-loader:${prop("deps.fabric")}")
+    minecraft("com.mojang:minecraft:${prop("minecraft_version")}")
+    implementation("net.fabricmc:fabric-loader:${prop("loader_version")}")
+
     // Минимум нужного для нашего мода
-    modstitchModImplementation("net.fabricmc.fabric-api:fabric-lifecycle-events-v1:4.0.5+c82f0461c3")
-    modstitchModImplementation("net.fabricmc.fabric-api:fabric-key-mapping-api-v1:${prop("deps.keymap")}")
-    modstitchModImplementation("net.fabricmc.fabric-api:fabric-message-api-v1:${prop("deps.msg")}")
-    modstitchModImplementation("net.fabricmc.fabric-api:fabric-rendering-v1:${prop("deps.render")}")
+    implementation("net.fabricmc.fabric-api:fabric-lifecycle-events-v1:${prop("deps.lifecycle")}")
+    implementation("net.fabricmc.fabric-api:fabric-key-mapping-api-v1:${prop("deps.keymap")}")
+    implementation("net.fabricmc.fabric-api:fabric-message-api-v1:${prop("deps.msg")}")
+    implementation("net.fabricmc.fabric-api:fabric-rendering-v1:${prop("deps.render")}")
 }
+
 tasks.processResources {
-    // modstitch уже делает подстановки, но оставим и version для удобства
-    inputs.property("version", prop("mod.version"))
-    inputs.property("mcdep", prop("mod.mcdep"))
-    inputs.property("mod_name", prop("mod.name"))
-    inputs.property("mod_description", prop("mod.description"))
+    val version = prop("mod.version")
+    val mcdep = prop("mod.mcdep")
+    inputs.property("version", version)
+    inputs.property("mcdep", mcdep)
+    filteringCharset = "UTF-8"
     filesMatching("fabric.mod.json") {
         expand(
-            "version" to prop("mod.version"),
-            "mcdep" to prop("mod.mcdep"),
-            "mod_name" to prop("mod.name"),
-            "mod_description" to prop("mod.description")
+            "version" to version,
+            "mcdep" to mcdep
         )
     }
 }
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+    withSourcesJar()
 }
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
+    options.release.set(25)
 }
 
+tasks.jar {
+    from("LICENSE") {
+        rename { "${it}_${prop("mod.id")}" }
+    }
+}

@@ -245,7 +245,7 @@ public final class NotebookShare {
             } else {
                 UiFeedback.actionBar(Component.translatable("lavamenu.notebook.received"));
             }
-            if (mc.screen instanceof LavaMenuScreen screen) {
+            if (mc.gui.screen() instanceof LavaMenuScreen screen) {
                 screen.onNotebookChanged();
             }
         });

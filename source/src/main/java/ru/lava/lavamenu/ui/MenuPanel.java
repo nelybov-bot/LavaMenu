@@ -27,9 +27,13 @@ public final class MenuPanel {
 
     public static void drawFrame(GuiGraphicsExtractor gfx, Font font, Component title,
                                  int x, int y, int w, int h) {
+        // Тонкая рамка + тело
+        gfx.fill(x - 1, y - 1, x + w + 1, y + h + 1, UiTheme.FRAME_BORDER);
         gfx.fill(x, y, x + w, y + h, UiTheme.PANEL_BG);
+        // Акцент-полоса + шапка
         gfx.fill(x, y, x + w, y + 2, UiTheme.ACCENT);
         gfx.fill(x, y + 2, x + w, y + 2 + UiTheme.HEADER_H, UiTheme.HEADER_BG);
+        gfx.fill(x, y + 2 + UiTheme.HEADER_H, x + w, y + 3 + UiTheme.HEADER_H, UiTheme.DIVIDER);
         gfx.text(font, title, x + UiTheme.PAD, y + 6, UiTheme.TEXT_PRIMARY, false);
     }
 
@@ -48,31 +52,34 @@ public final class MenuPanel {
 
     public static void drawRowHover(GuiGraphicsExtractor gfx, int x, int y, int w, int h) {
         gfx.fill(x, y, x + w, y + h, UiTheme.ROW_HOVER);
+        gfx.fill(x, y, x + 2, y + h, UiTheme.ACCENT_SOFT);
     }
 
     public static void drawStatusDot(GuiGraphicsExtractor gfx, int x, int y, int rowH, boolean online) {
-        int size = 6;
+        int size = 5;
         int dy = y + (rowH - size) / 2;
         gfx.fill(x, dy, x + size, dy + size, online ? UiTheme.ONLINE : UiTheme.OFFLINE);
     }
 
     /** Точка статуса на линии текста (не по центру высокой строки). */
     public static void drawStatusDotAt(GuiGraphicsExtractor gfx, int x, int textY, boolean online) {
-        int size = 6;
-        int dy = textY + 1;
+        int size = 5;
+        int dy = textY + 2;
         gfx.fill(x, dy, x + size, dy + size, online ? UiTheme.ONLINE : UiTheme.OFFLINE);
     }
 
     public static void drawAvatar(GuiGraphicsExtractor gfx, Font font, String initials, int x, int y, int size) {
         gfx.fill(x, y, x + size, y + size, UiTheme.TAB_ACTIVE_BG);
+        gfx.fill(x, y, x + size, y + 1, UiTheme.ACCENT_SOFT);
         gfx.centeredText(font, Component.literal(initials), x + size / 2, y + (size - 8) / 2, UiTheme.ACCENT);
     }
 
     public static void drawDialog(GuiGraphicsExtractor gfx, Font font, Component title, Component message,
                                   int screenW, int screenH, int boxW, int boxH) {
-        gfx.fill(0, 0, screenW, screenH, 0xCC000000);
+        gfx.fill(0, 0, screenW, screenH, 0xCC080A0C);
         int bx = (screenW - boxW) / 2;
         int by = (screenH - boxH) / 2;
+        gfx.fill(bx - 1, by - 1, bx + boxW + 1, by + boxH + 1, UiTheme.FRAME_BORDER);
         gfx.fill(bx, by, bx + boxW, by + boxH, UiTheme.PANEL_BG);
         gfx.fill(bx, by, bx + boxW, by + 2, UiTheme.ACCENT);
         gfx.text(font, title, bx + 12, by + 10, UiTheme.TEXT_PRIMARY, false);

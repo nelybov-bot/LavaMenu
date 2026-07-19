@@ -84,7 +84,7 @@ public final class ChatConversationScreen extends Screen {
 
     private void closeToParent() {
         ChatStore.get().setViewing(null);
-        Minecraft.getInstance().setScreen(parent);
+        Minecraft.getInstance().gui.setScreen(parent);
     }
 
     private void send() {

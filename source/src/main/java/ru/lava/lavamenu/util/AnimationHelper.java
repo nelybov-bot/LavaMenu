@@ -37,7 +37,7 @@ public final class AnimationHelper {
 
     public static void closeAndPlay(Type type) {
         Minecraft mc = Minecraft.getInstance();
-        mc.setScreen(null);
+        mc.gui.setScreen(null);
         mc.execute(() -> play(type));
     }
 

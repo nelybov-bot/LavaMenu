@@ -35,19 +35,19 @@ public final class RadialExecutor {
                 }
             }
             case OPEN_HOMES -> {
-                mc.setScreen(new HomesQuickScreen());
+                mc.gui.setScreen(new HomesQuickScreen());
                 return false;
             }
             case FRIEND_QUICK -> {
-                mc.setScreen(new FriendsQuickScreen());
+                mc.gui.setScreen(new FriendsQuickScreen());
                 return false;
             }
             case OPEN_CHATS -> {
-                mc.setScreen(new LavaMenuScreen(LavaMenuScreen.Tab.CHATS));
+                mc.gui.setScreen(new LavaMenuScreen(LavaMenuScreen.Tab.CHATS));
                 return false;
             }
             case OPEN_MENU -> {
-                mc.setScreen(new LavaMenuScreen());
+                mc.gui.setScreen(new LavaMenuScreen());
                 return false;
             }
             case FAVORITE_1 -> {
@@ -58,7 +58,7 @@ public final class RadialExecutor {
                     LavaMenuConfig.get().save();
                     CommandHelper.closeAndSend("home " + name);
                 } else if (favs.size() > 1) {
-                    mc.setScreen(new FavoriteHomesQuickScreen());
+                    mc.gui.setScreen(new FavoriteHomesQuickScreen());
                     return false;
                 }
             }

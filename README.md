@@ -1,10 +1,10 @@
 # LavaMenu
 
-Клиентский Fabric-мод для сервера LavaWin (Minecraft Java **26.1.x**).
+Клиентский Fabric-мод для сервера LavaWin (Minecraft Java **26.2**).
 
 ## Установка
 
-Скопируйте `release/lavamenu-0.1.5.jar` в `.minecraft/mods/`.
+Скопируйте `release/lavamenu-0.2.0.jar` в `.minecraft/mods/` (нужны Fabric Loader **0.19+** и Fabric API для 26.2).
 
 - Конфиг: `.minecraft/config/lavamenu.json`
 - Чаты: `.minecraft/config/lavamenu-chats.json`
@@ -21,7 +21,7 @@ export JAVA_HOME="/usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
 ./gradlew build
 ```
 
-Готовый JAR: `source/build/libs/lavamenu-0.1.5.jar`
+Готовый JAR: `source/build/libs/lavamenu-0.2.0.jar`
 
 ## Управление
 

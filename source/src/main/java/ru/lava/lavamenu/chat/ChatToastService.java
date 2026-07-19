@@ -47,7 +47,7 @@ public final class ChatToastService {
         String viewing = ChatStore.get().viewingNick();
         if (viewing != null && viewing.equalsIgnoreCase(fromNick)) return;
 
-        if (mc.screen instanceof ChatToastScreen toast && toast.nick().equalsIgnoreCase(fromNick)) {
+        if (mc.gui.screen() instanceof ChatToastScreen toast && toast.nick().equalsIgnoreCase(fromNick)) {
             toast.updatePreview(message);
             return;
         }
@@ -74,7 +74,7 @@ public final class ChatToastService {
         }
         handleClick();
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen == null && isVisible() && KeyBindings.OPEN_REPLY != null) {
+        if (mc.gui.screen() == null && isVisible() && KeyBindings.OPEN_REPLY != null) {
             while (KeyBindings.OPEN_REPLY.consumeClick()) {
                 openReply();
             }
@@ -100,12 +100,12 @@ public final class ChatToastService {
         String n = nick;
         String preview = text;
         dismiss();
-        Minecraft.getInstance().setScreen(new ChatToastScreen(n, preview));
+        Minecraft.getInstance().gui.setScreen(new ChatToastScreen(n, preview));
     }
 
     private static void handleClick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.screen != null) {
+        if (mc.player == null || mc.gui.screen() != null) {
             leftWasDown = mc.mouseHandler.isLeftPressed();
             return;
         }
@@ -127,7 +127,7 @@ public final class ChatToastService {
 
     private static void renderHud(GuiGraphicsExtractor gfx) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen instanceof ChatToastScreen) return;
+        if (mc.gui.screen() instanceof ChatToastScreen) return;
         if (!isVisible()) return;
         int sw = mc.getWindow().getGuiScaledWidth();
         int sh = mc.getWindow().getGuiScaledHeight();

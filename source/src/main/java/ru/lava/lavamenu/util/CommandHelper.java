@@ -55,7 +55,7 @@ public final class CommandHelper {
     /** Закрыть экран и выполнить команду на следующем тике (нужно для /sit, /lay, /ah). */
     public static void closeAndSend(String commandWithoutSlash) {
         Minecraft mc = Minecraft.getInstance();
-        mc.setScreen(null);
+        mc.gui.setScreen(null);
         mc.execute(() -> {
             if (sendFromUi(commandWithoutSlash)) {
                 UiFeedback.actionBar("§7→ /" + stripSlash(commandWithoutSlash));

@@ -78,7 +78,7 @@ public final class ChatToastScreen extends Screen {
         String draft = input == null ? "" : input.getValue();
         ChatStore.get().getOrCreate(nick);
         ChatStore.get().save();
-        Minecraft.getInstance().setScreen(new ChatConversationScreen(null, nick, draft));
+        Minecraft.getInstance().gui.setScreen(new ChatConversationScreen(null, nick, draft));
     }
 
     private void send() {
@@ -136,6 +136,6 @@ public final class ChatToastScreen extends Screen {
 
     @Override
     public void onClose() {
-        Minecraft.getInstance().setScreen(null);
+        Minecraft.getInstance().gui.setScreen(null);
     }
 }

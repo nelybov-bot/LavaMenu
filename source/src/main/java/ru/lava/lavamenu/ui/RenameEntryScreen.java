@@ -38,13 +38,13 @@ public final class RenameEntryScreen extends Screen {
                 Component.translatable("lavamenu.common.apply"), LavaWidgets.BtnStyle.PRIMARY, this::apply));
         addRenderableWidget(LavaWidgets.styled(cx + 4, cy + 22, 106, 22,
                 Component.translatable("lavamenu.common.cancel"), LavaWidgets.BtnStyle.SECONDARY,
-                () -> Minecraft.getInstance().setScreen(parent)));
+                () -> Minecraft.getInstance().gui.setScreen(parent)));
     }
 
     private void apply() {
         String v = field.getValue().trim();
         if (!v.isEmpty()) onApply.accept(v);
-        Minecraft.getInstance().setScreen(parent);
+        Minecraft.getInstance().gui.setScreen(parent);
     }
 
     @Override
@@ -56,7 +56,7 @@ public final class RenameEntryScreen extends Screen {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
-            Minecraft.getInstance().setScreen(parent);
+            Minecraft.getInstance().gui.setScreen(parent);
             return true;
         }
         if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER) {

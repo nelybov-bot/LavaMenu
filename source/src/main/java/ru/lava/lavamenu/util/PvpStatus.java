@@ -70,7 +70,7 @@ public final class PvpStatus {
     private static String tabText() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.gui == null) return "";
-        PlayerTabOverlay tab = mc.gui.getTabList();
+        PlayerTabOverlay tab = mc.gui.hud.getTabList();
         if (tab == null) return "";
         resolveFields();
         StringBuilder sb = new StringBuilder();

@@ -3,6 +3,7 @@ package ru.lava.lavamenu.notebook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import ru.lava.lavamenu.ui.LavaMenuScreen;
+import ru.lava.lavamenu.util.ClientTickQueue;
 import ru.lava.lavamenu.util.CommandHelper;
 import ru.lava.lavamenu.util.UiFeedback;
 
@@ -15,8 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Передача тетрадки через /msg.
  * Строки: {@code [LMNB]S|from}, {@code [LMNB]E|nick|reason}, {@code [LMNB]D|count}.
  * <p>
- * Важно: одно PM может прийти и как CHAT, и как GAME — повторный {@code S|} не должен
- * сбрасывать уже принятые {@code E|}.
+ * Зритель принимает снимок только от доверенных редакторов ({@link NotebookAccess#isTrustedEditor}).
+ * Повторный {@code S|} того же отправителя (CHAT+GAME) не сбрасывает уже принятые {@code E|}.
  */
 public final class NotebookShare {
     public static final String MARK = "[LMNB]";
@@ -52,7 +53,6 @@ public final class NotebookShare {
                 if (e == null || e.nick == null || e.nick.isBlank()) continue;
                 String nick = sanitize(e.nick);
                 String reason = sanitize(e.reason);
-                // ужимаем reason, если вместе с ником не влезает
                 String line = MARK + "E|" + nick + "|" + reason;
                 if (line.length() > MAX_PAYLOAD) {
                     int keep = Math.max(0, MAX_PAYLOAD - (MARK + "E|" + nick + "|").length());
@@ -94,7 +94,6 @@ public final class NotebookShare {
             return;
         }
         String payload = payloads.get(index);
-        // chat-команда: надёжнее для длинного текста на части серверов
         boolean ok = CommandHelper.sendChatCommand("msg " + target + " " + payload);
         if (!ok) {
             sending.set(false);
@@ -106,22 +105,7 @@ public final class NotebookShare {
             UiFeedback.actionBar(Component.translatable("lavamenu.notebook.shown", target));
             return;
         }
-        scheduleNext(target, payloads, index + 1, TICKS_BETWEEN);
-    }
-
-    private static void scheduleNext(String target, List<String> payloads, int nextIndex, int ticksLeft) {
-        Minecraft mc = Minecraft.getInstance();
-        if (ticksLeft <= 0) {
-            sendNext(target, payloads, nextIndex);
-            return;
-        }
-        mc.execute(() -> {
-            if (mc.player == null) {
-                sending.set(false);
-                return;
-            }
-            scheduleNext(target, payloads, nextIndex, ticksLeft - 1);
-        });
+        ClientTickQueue.schedule(TICKS_BETWEEN, () -> sendNext(target, payloads, index + 1));
     }
 
     /** Тик клиента: применить частичный снимок, если D| так и не пришёл. */
@@ -136,35 +120,36 @@ public final class NotebookShare {
         if (!isSharePayload(text)) return false;
         if (NotebookAccess.canEdit()) return true;
 
+        // Чужой / неизвестный отправитель — глотаем пакет, снимок не трогаем
+        if (!NotebookAccess.isTrustedEditor(senderNick)) {
+            return true;
+        }
+
         expirePendingIfNeeded(true);
 
         String body = text.trim().substring(MARK.length()).trim();
         if (body.startsWith("S|")) {
-            boolean sameSender = pendingStartedMs > 0L && (
-                    pendingSender.isBlank()
-                            || senderNick == null
-                            || senderNick.isBlank()
-                            || pendingSender.equalsIgnoreCase(senderNick.trim()));
-            // Повтор того же S| (CHAT+GAME) — не чистим уже принятые E|
-            if (sameSender && pendingStartedMs > 0L) {
+            boolean sameSender = pendingStartedMs > 0L
+                    && !pendingSender.isBlank()
+                    && pendingSender.equalsIgnoreCase(senderNick.trim());
+            if (sameSender) {
                 return true;
             }
-            // Чужой параллельный шаре — игнор
+            // Чужой параллельный шаре от другого редактора — игнор, пока идёт текущий
             if (pendingStartedMs > 0L && !sameSender) {
                 return true;
             }
             pending.clear();
-            pendingFrom = body.length() > 2 ? body.substring(2).trim() : (senderNick == null ? "" : senderNick);
-            pendingSender = senderNick == null ? "" : senderNick.trim();
+            pendingFrom = body.length() > 2 ? body.substring(2).trim() : senderNick.trim();
+            pendingSender = senderNick.trim();
             pendingStartedMs = System.currentTimeMillis();
             return true;
         }
         if (!acceptFromSender(senderNick)) return true;
         if (body.startsWith("E|")) {
+            // Без открытой сессии S| — не начинаем приём с произвольного E|
             if (pendingStartedMs == 0L) {
-                pendingStartedMs = System.currentTimeMillis();
-                pendingFrom = senderNick == null ? "" : senderNick;
-                pendingSender = senderNick == null ? "" : senderNick.trim();
+                return true;
             }
             String rest = body.substring(2);
             int sep = rest.indexOf('|');
@@ -176,15 +161,16 @@ public final class NotebookShare {
             return true;
         }
         if (body.startsWith("D|")) {
-            // Повторный D| после commit (CHAT+GAME) — не затирать снимок пустым
             if (pendingStartedMs == 0L && pending.isEmpty()) {
                 return true;
             }
-            String from = pendingFrom.isBlank() && senderNick != null ? senderNick : pendingFrom;
+            String from = pendingFrom.isBlank() ? senderNick.trim() : pendingFrom;
             int expected = -1;
             try {
                 expected = Integer.parseInt(body.substring(2).trim());
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException e) {
+                // partial commit ниже
+            }
             List<NotebookEntry> copy = new ArrayList<>(pending);
             clearPending();
             commitShare(copy, from, expected);
@@ -205,12 +191,12 @@ public final class NotebookShare {
     }
 
     private static boolean acceptFromSender(String senderNick) {
-        if (pendingStartedMs == 0L) return true;
-        if (pendingSender.isBlank() || senderNick == null || senderNick.isBlank()) return true;
+        if (pendingStartedMs == 0L) return false;
+        if (pendingSender.isBlank() || senderNick == null || senderNick.isBlank()) return false;
+        if (!NotebookAccess.isTrustedEditor(pendingSender)) return false;
         return pendingSender.equalsIgnoreCase(senderNick.trim());
     }
 
-    /** Если D| потерян — сохранить то, что успело прийти. */
     private static void expirePendingIfNeeded(boolean applyPartial) {
         if (pendingStartedMs == 0L) return;
         long now = System.currentTimeMillis();

@@ -205,14 +205,15 @@ public final class LavaMenuScreen extends Screen {
     private int notebookListBottom() { return innerBottom(); }
     private static int notebookStep() { return NOTEBOOK_ROW_H + UiTheme.ROW_GAP; }
 
-    // SETTINGS: режим → hint (клавиши в MC) → notify → sound → update → slots (≥4 видимых)
-    private int settingsModeY() { return innerY() + 8; }
-    private int settingsHintY() { return settingsModeY() + 14; }
-    private int settingsNotifyY() { return settingsHintY() + 12; }
-    private int settingsSoundY() { return settingsNotifyY() + 15; }
-    private int settingsUpdateY() { return settingsSoundY() + 15; }
+    // SETTINGS: enabled → mode → hint → notify → sound → update → slots
+    private int settingsEnabledY() { return innerY() + 6; }
+    private int settingsModeY() { return settingsEnabledY() + 14; }
+    private int settingsHintY() { return settingsModeY() + 13; }
+    private int settingsNotifyY() { return settingsHintY() + 11; }
+    private int settingsSoundY() { return settingsNotifyY() + 14; }
+    private int settingsUpdateY() { return settingsSoundY() + 14; }
     private int settingsUpdateBtnY() { return settingsUpdateY() + 10; }
-    private int settingsSlotsTop() { return settingsUpdateBtnY() + UiTheme.ROW_H + 6; }
+    private int settingsSlotsTop() { return settingsUpdateBtnY() + UiTheme.ROW_H + 5; }
     private int settingsSlotsListTop() { return settingsSlotsTop() + 11; }
     private int settingsSlotsBottom() { return innerBottom(); }
 
@@ -633,6 +634,12 @@ public final class LavaMenuScreen extends Screen {
         ModUpdateService upd = ModUpdateService.get();
         upd.setUiListener(this::rebuildWidgets);
 
+        addRenderableWidget(LavaWidgets.toggle(px + w - UiTheme.TOGGLE_W, settingsEnabledY() + 2,
+                LavaMenuConfig.get().radial.enabled(), on -> {
+                    LavaMenuConfig.get().radial.setEnabled(on);
+                    LavaMenuConfig.get().save();
+                }));
+
         radialModeToggle = LavaWidgets.toggle(px + w - UiTheme.TOGGLE_W, settingsModeY() + 2,
                 LavaMenuConfig.get().radial.mode() == LavaMenuConfig.RadialMode.HOLD, on -> {
                     LavaMenuConfig.get().radial.setMode(on ? LavaMenuConfig.RadialMode.HOLD : LavaMenuConfig.RadialMode.TOGGLE);
@@ -674,7 +681,6 @@ public final class LavaMenuScreen extends Screen {
 
         var radial = LavaMenuConfig.get().radial;
         radial.ensureDefaults();
-        radial.setEnabled(true);
 
         int top = settingsSlotsListTop(), bottom = settingsSlotsBottom();
         int y = top - radialScroll * step();
@@ -1076,6 +1082,9 @@ public final class LavaMenuScreen extends Screen {
         MenuPanel.drawScrollCap(gfx, x, innerY(), w, settingsSlotsTop() - innerY());
         MenuPanel.drawSection(gfx, font, Component.translatable("lavamenu.settings.section_keys"), x, py);
         int togglePad = UiTheme.TOGGLE_W + 6;
+        gfx.text(font, Component.literal(ellipsize(
+                        Component.translatable("lavamenu.radial.enabled_label").getString(), w - togglePad)),
+                x, settingsEnabledY() + 2, UiTheme.TEXT_PRIMARY, false);
         gfx.text(font, Component.literal(ellipsize(
                         Component.translatable("lavamenu.radial.mode_label").getString(), w - togglePad)),
                 x, settingsModeY() + 2, UiTheme.TEXT_PRIMARY, false);

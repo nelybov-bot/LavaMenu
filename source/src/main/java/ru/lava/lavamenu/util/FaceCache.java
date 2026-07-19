@@ -146,7 +146,8 @@ public final class FaceCache {
         try (InputStream in = Files.newInputStream(png)) {
             NativeImage img = NativeImage.read(in);
             registerImage(key, img);
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("FaceCache registerFile {}: {}", key, e.toString());
         }
     }
 
@@ -204,7 +205,8 @@ public final class FaceCache {
                 loaded.remove(key);
                 capturedFromBody.remove(key);
             }
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("FaceCache trim failed: {}", e.toString());
         }
     }
 }

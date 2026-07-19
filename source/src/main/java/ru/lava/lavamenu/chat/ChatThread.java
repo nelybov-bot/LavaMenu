@@ -3,7 +3,7 @@ package ru.lava.lavamenu.chat;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Переписка с одним ником. История не обрезается — удаление только вручную. */
+/** Переписка с одним ником. История не обрезается — удаление только вручную (✕). */
 public final class ChatThread {
     public String nick;
     public int unread;

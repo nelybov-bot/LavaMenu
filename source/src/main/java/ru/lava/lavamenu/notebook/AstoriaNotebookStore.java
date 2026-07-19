@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.fabricmc.loader.api.FabricLoader;
+import ru.lava.lavamenu.LavaMenuClient;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -93,7 +94,8 @@ public final class AstoriaNotebookStore {
                 }
                 if (sharedFrom.isBlank()) sharedFrom = "?";
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            LavaMenuClient.LOGGER.warn("AstoriaNotebookStore load failed: {}", t.toString());
         }
     }
 
@@ -101,7 +103,9 @@ public final class AstoriaNotebookStore {
         Path p = path();
         try {
             Files.createDirectories(p.getParent());
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("AstoriaNotebookStore mkdir failed: {}", e.toString());
+        }
         JsonObject root = new JsonObject();
         if (sharedFrom != null && !sharedFrom.isBlank()) {
             root.addProperty("sharedFrom", sharedFrom);
@@ -118,7 +122,9 @@ public final class AstoriaNotebookStore {
         root.add("entries", arr);
         try (Writer w = Files.newBufferedWriter(p, StandardCharsets.UTF_8)) {
             GSON.toJson(root, w);
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("AstoriaNotebookStore save failed: {}", e.toString());
+        }
     }
 
     public synchronized boolean add(String nick, String reason) {

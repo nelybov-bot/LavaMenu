@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.fabricmc.loader.api.FabricLoader;
+import ru.lava.lavamenu.LavaMenuClient;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -19,14 +20,18 @@ import java.util.Locale;
 
 /**
  * Локальное хранилище ЛС. Файл: {@code config/lavamenu-chats.json}.
+ * Сохранение троттлится (~1 с), чтобы не писать диск на каждое входящее.
  */
 public final class ChatStore {
     private static final ChatStore INSTANCE = new ChatStore();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final long SAVE_DEBOUNCE_MS = 1000L;
 
     private final List<ChatThread> threads = new ArrayList<>();
     private String viewingNick = null;
     private Runnable changeListener = () -> {};
+    private boolean dirty;
+    private long lastSaveMs;
 
     public static ChatStore get() {
         return INSTANCE;
@@ -46,7 +51,7 @@ public final class ChatStore {
         return FabricLoader.getInstance().getConfigDir().resolve("lavamenu-chats.json");
     }
 
-    public void load() {
+    public synchronized void load() {
         Path p = path();
         if (!Files.exists(p)) return;
         try (Reader r = Files.newBufferedReader(p, StandardCharsets.UTF_8)) {
@@ -69,15 +74,38 @@ public final class ChatStore {
                 }
                 if (!t.nick.isBlank()) threads.add(t);
             });
-        } catch (Throwable ignored) {
+            dirty = false;
+        } catch (Throwable t) {
+            LavaMenuClient.LOGGER.warn("ChatStore load failed: {}", t.toString());
         }
     }
 
-    public void save() {
+    public synchronized void save() {
+        saveNow();
+    }
+
+    private void markDirty() {
+        dirty = true;
+        long now = System.currentTimeMillis();
+        if (now - lastSaveMs >= SAVE_DEBOUNCE_MS) {
+            saveNow();
+        }
+    }
+
+    /** Сброс отложенной записи (вызывать из тика клиента). */
+    public synchronized void flushIfNeeded() {
+        if (!dirty) return;
+        if (System.currentTimeMillis() - lastSaveMs < SAVE_DEBOUNCE_MS) return;
+        saveNow();
+    }
+
+    private void saveNow() {
         Path p = path();
         try {
             Files.createDirectories(p.getParent());
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("ChatStore mkdir failed: {}", e.toString());
+        }
         JsonObject root = new JsonObject();
         JsonArray arr = new JsonArray();
         for (ChatThread t : threads) {
@@ -99,7 +127,11 @@ public final class ChatStore {
         root.add("threads", arr);
         try (Writer w = Files.newBufferedWriter(p, StandardCharsets.UTF_8)) {
             GSON.toJson(root, w);
-        } catch (IOException ignored) {}
+            dirty = false;
+            lastSaveMs = System.currentTimeMillis();
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("ChatStore save failed: {}", e.toString());
+        }
     }
 
     public synchronized List<ChatThread> threadsNewestFirst() {
@@ -120,7 +152,6 @@ public final class ChatStore {
     public synchronized ChatThread getOrCreate(String nick) {
         ChatThread existing = find(nick);
         if (existing != null) {
-            // сохраняем регистр с сервера, если пришёл новый
             if (!existing.nick.equals(nick) && nick != null && !nick.isBlank()) {
                 existing.nick = nick;
             }
@@ -145,7 +176,7 @@ public final class ChatStore {
         if (t == null) return;
         if (t.unread != 0) {
             t.unread = 0;
-            save();
+            markDirty();
             notifyChanged();
         }
     }
@@ -155,7 +186,7 @@ public final class ChatStore {
         if (t == null) return;
         threads.remove(t);
         if (viewingNick != null && viewingNick.equalsIgnoreCase(nick)) viewingNick = null;
-        save();
+        saveNow();
         notifyChanged();
     }
 
@@ -167,7 +198,6 @@ public final class ChatStore {
         if (nick == null || nick.isBlank() || text == null || text.isBlank()) return;
         ChatThread t = getOrCreate(nick.trim());
 
-        // антидубль: эхо /msg после оптимистичной отправки
         if (fromServer && !t.messages.isEmpty()) {
             ChatMessage last = t.lastMessage();
             if (last != null && last.outgoing == outgoing && last.text.equals(text)
@@ -186,11 +216,10 @@ public final class ChatStore {
             t.unread = 0;
         }
 
-        // поднять тред
         threads.remove(t);
         threads.add(0, t);
 
-        save();
+        markDirty();
         notifyChanged();
 
         if (fromServer && !outgoing) {

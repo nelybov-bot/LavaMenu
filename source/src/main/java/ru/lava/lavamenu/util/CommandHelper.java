@@ -45,7 +45,6 @@ public final class CommandHelper {
             }
         }
 
-        // sendCommand = то же, что ввод /cmd в чате (ServerboundChatCommandPacket)
         mc.player.connection.sendCommand(cmd);
         lastSentMs = now;
         lastCommand = cmd;
@@ -56,30 +55,17 @@ public final class CommandHelper {
     public static void closeAndSend(String commandWithoutSlash) {
         Minecraft mc = Minecraft.getInstance();
         mc.gui.setScreen(null);
-        mc.execute(() -> {
+        ClientTickQueue.schedule(1, () -> {
             if (sendFromUi(commandWithoutSlash)) {
                 UiFeedback.actionBar("§7→ /" + stripSlash(commandWithoutSlash));
             }
         });
     }
 
+    /** Задержка в игровых тиках клиента (не кадрах рендера). */
     public static void sendDelayed(String commandWithoutSlash, int ticks) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
-        int[] left = {ticks};
-        Runnable task = new Runnable() {
-            @Override
-            public void run() {
-                if (mc.player == null) return;
-                left[0]--;
-                if (left[0] <= 0) {
-                    sendFromUi(commandWithoutSlash);
-                } else {
-                    mc.execute(this);
-                }
-            }
-        };
-        mc.execute(task);
+        if (Minecraft.getInstance().player == null) return;
+        ClientTickQueue.schedule(Math.max(1, ticks), () -> sendFromUi(commandWithoutSlash));
     }
 
     private static String stripSlash(String cmd) {

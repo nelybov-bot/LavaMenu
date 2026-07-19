@@ -92,7 +92,8 @@ public final class KeyBindings {
                 Object result = keyField.get(mapping);
                 if (result instanceof InputConstants.Key key) return key;
             }
-        } catch (ReflectiveOperationException ignored) {
+        } catch (ReflectiveOperationException e) {
+            LavaMenuClient.LOGGER.debug("KeyBindings key resolve failed: {}", e.toString());
         }
         return InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_G);
     }

@@ -8,6 +8,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
+import ru.lava.lavamenu.LavaMenuClient;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,8 +50,8 @@ public final class RadialCenterIcon {
                     current = BAKED;
                 }
             }
-        } catch (IOException ignored) {
-            // fallback to resource blit
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.debug("RadialCenterIcon bake default failed: {}", e.toString());
         }
     }
 
@@ -78,6 +79,7 @@ public final class RadialCenterIcon {
                 current = CUSTOM;
             }
         } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("RadialCenterIcon custom load failed: {}", e.toString());
             current = bakedDefault ? BAKED : DEFAULT_RESOURCE;
         }
     }

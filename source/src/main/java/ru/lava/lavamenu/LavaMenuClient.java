@@ -19,6 +19,7 @@ import ru.lava.lavamenu.notebook.NotebookShare;
 import ru.lava.lavamenu.update.ModUpdateService;
 import ru.lava.lavamenu.update.UpdateToastService;
 import ru.lava.lavamenu.util.AnimationHelper;
+import ru.lava.lavamenu.util.ClientTickQueue;
 import ru.lava.lavamenu.util.FaceCache;
 import ru.lava.lavamenu.util.PvpStatus;
 import ru.lava.lavamenu.ui.ChatConversationScreen;
@@ -79,12 +80,14 @@ public final class LavaMenuClient implements ClientModInitializer {
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            ClientTickQueue.tick();
             HomesParser.tick();
             HomeRenameSession.tick();
             NotebookShare.tick();
             ChatToastService.tick();
             UpdateToastService.tick();
             FaceCache.get().tick();
+            ChatStore.get().flushIfNeeded();
 
             while (KeyBindings.OPEN_MAIN.consumeClick()) {
                 Minecraft mc = Minecraft.getInstance();
@@ -94,6 +97,7 @@ public final class LavaMenuClient implements ClientModInitializer {
             }
 
             Minecraft mc = Minecraft.getInstance();
+            boolean radialOn = LavaMenuConfig.get().radial.enabled();
             var mode = LavaMenuConfig.get().radial.mode();
             // Hold: физическая клавиша (isDown() мигает при открытом GUI).
             // Toggle: edge через isDown() достаточно.
@@ -102,7 +106,12 @@ public final class LavaMenuClient implements ClientModInitializer {
                     : KeyBindings.OPEN_RADIAL != null && KeyBindings.OPEN_RADIAL.isDown();
             boolean edge = down && !radialKeyWasDown;
 
-            if (mode == LavaMenuConfig.RadialMode.TOGGLE) {
+            if (!radialOn) {
+                if (mc.gui.screen() instanceof RadialMenuScreen) {
+                    mc.gui.setScreen(null);
+                }
+                radialSession = false;
+            } else if (mode == LavaMenuConfig.RadialMode.TOGGLE) {
                 if (edge) {
                     if (mc.gui.screen() instanceof RadialMenuScreen) {
                         mc.gui.setScreen(null);

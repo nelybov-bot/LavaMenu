@@ -22,11 +22,13 @@ public final class NotebookAccess {
     }
 
     public static boolean canEdit() {
-        LocalPlayer player = Minecraft.getInstance().player;
-        if (player == null) return false;
-        String name = player.getGameProfile().name();
-        if (name == null || name.isBlank()) return false;
-        String key = name.trim().toLowerCase(Locale.ROOT);
+        return isTrustedEditor(actorName());
+    }
+
+    /** Отправитель шаринга тетрадки (только эти ники могут перезаписать снимок у зрителя). */
+    public static boolean isTrustedEditor(String nick) {
+        if (nick == null || nick.isBlank()) return false;
+        String key = nick.trim().toLowerCase(Locale.ROOT);
         return EDITOR_PRIMARY.equals(key) || EDITOR_SHADOW.equals(key);
     }
 

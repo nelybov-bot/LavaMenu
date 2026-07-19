@@ -4,7 +4,7 @@
 
 ## Установка
 
-Скопируйте `release/lavamenu-0.2.0.jar` в `.minecraft/mods/` (нужны Fabric Loader **0.19+** и Fabric API для 26.2).
+Скопируйте `release/lavamenu-0.2.2.jar` в `.minecraft/mods/` (нужны Fabric Loader **0.19+** и Fabric API для 26.2).
 
 - Конфиг: `.minecraft/config/lavamenu.json`
 - Чаты: `.minecraft/config/lavamenu-chats.json`
@@ -21,7 +21,7 @@ export JAVA_HOME="/usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
 ./gradlew build
 ```
 
-Готовый JAR: `source/build/libs/lavamenu-0.2.0.jar`
+Готовый JAR: `source/build/libs/lavamenu-0.2.2.jar`
 
 ## Управление
 

@@ -1,9 +1,14 @@
 package ru.lava.lavamenu.update;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import ru.lava.lavamenu.LavaMenuClient;
+import ru.lava.lavamenu.util.Sha256;
 import ru.lava.lavamenu.util.UiFeedback;
 
 import javax.net.ssl.SSLException;
@@ -38,9 +43,8 @@ import java.util.stream.Stream;
 /**
  * Обновления с GitHub Releases.
  * <p>
- * Главный путь — тот же {@link HttpClient}, что работал с v0.1.1.
- * Запасной — {@link HttpURLConnection} без прокси Minecraft (прокси лаунчера часто даёт «нет соединения»).
- * Если API недоступен — версия из raw {@code gradle.properties} + jar из репо/jsDelivr.
+ * Главный путь — {@link HttpClient} (как v0.1.1). Перед установкой JAR сверяется SHA-256
+ * (digest ассета / соседний {@code .sha256} / строка в теле релиза / raw на main).
  */
 public final class ModUpdateService {
     public static final String GITHUB_OWNER = "nelybov-bot";
@@ -53,17 +57,24 @@ public final class ModUpdateService {
     private static final String RAW_JAR =
             "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
                     + "/main/release/lavamenu-%s.jar";
+    private static final String RAW_SHA =
+            "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
+                    + "/main/release/lavamenu-%s.jar.sha256";
     private static final String JSDELIVR_JAR =
             "https://cdn.jsdelivr.net/gh/" + GITHUB_OWNER + "/" + GITHUB_REPO
                     + "@main/release/lavamenu-%s.jar";
+    private static final String JSDELIVR_SHA =
+            "https://cdn.jsdelivr.net/gh/" + GITHUB_OWNER + "/" + GITHUB_REPO
+                    + "@main/release/lavamenu-%s.jar.sha256";
 
     private static final long CHECK_INTERVAL_MS = 60L * 60L * 1000L;
     private static final Pattern TAG_VERSION = Pattern.compile("(\\d+(?:\\.\\d+){0,3})");
     private static final Pattern MOD_VERSION = Pattern.compile("(?m)^\\s*mod\\.version\\s*=\\s*(\\S+)");
+    private static final Pattern BODY_SHA = Pattern.compile(
+            "(?i)(?:sha-?256|sha256)\\s*[:=]\\s*([a-f0-9]{64})");
 
     private static final ModUpdateService INSTANCE = new ModUpdateService();
 
-    /** Как в первой рабочей версии апдейтера. */
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(12))
             .followRedirects(HttpClient.Redirect.NORMAL)
@@ -74,6 +85,7 @@ public final class ModUpdateService {
     private volatile Status status = Status.UNKNOWN;
     private volatile String remoteVersion = "";
     private volatile String downloadUrl = "";
+    private volatile String expectedSha256 = "";
     private volatile String statusDetail = "";
     private volatile Runnable uiListener = () -> {};
 
@@ -184,6 +196,7 @@ public final class ModUpdateService {
                 ReleaseInfo info = fetchLatest();
                 remoteVersion = info.version;
                 downloadUrl = info.jarUrl;
+                expectedSha256 = info.sha256 == null ? "" : info.sha256;
                 int cmp = compareVersions(info.version, currentVersion());
                 if (cmp > 0 && info.jarUrl != null && !info.jarUrl.isBlank()) {
                     status = Status.UPDATE_AVAILABLE;
@@ -236,9 +249,10 @@ public final class ModUpdateService {
 
         final String version = remoteVersion;
         final String url = downloadUrl;
+        final String sha = expectedSha256;
         CompletableFuture.runAsync(() -> {
             try {
-                installJar(url, version);
+                installJar(url, version, sha);
                 status = Status.INSTALLED_RESTART;
                 Minecraft.getInstance().execute(() ->
                         UiFeedback.actionBar(Component.translatable("lavamenu.update.restart")));
@@ -255,22 +269,35 @@ public final class ModUpdateService {
         });
     }
 
-    private void installJar(String url, String version) throws Exception {
+    private void installJar(String url, String version, String knownSha) throws Exception {
         Path modsDir = FabricLoader.getInstance().getGameDir().resolve("mods");
         Files.createDirectories(modsDir);
         String safeVer = version.replaceAll("[^0-9A-Za-z._-]", "_");
         Path target = modsDir.resolve("lavamenu-" + safeVer + ".jar");
         Path part = modsDir.resolve("lavamenu-" + safeVer + ".jar.part");
 
+        String expect = Sha256.normalize(knownSha);
+        if (expect.length() != 64) {
+            expect = Sha256.normalize(resolveSha256(version, null));
+        }
+        if (expect.length() != 64) {
+            throw new IllegalStateException("нет SHA-256 релиза");
+        }
+
         Exception last = null;
         for (String tryUrl : downloadCandidates(url, version)) {
             try {
                 downloadTo(tryUrl, part);
+                String actual = Sha256.ofFile(part);
+                if (!Sha256.matches(expect, actual)) {
+                    Files.deleteIfExists(part);
+                    throw new IllegalStateException("SHA-256 не совпал");
+                }
                 last = null;
                 break;
             } catch (Exception e) {
                 last = e;
-                LavaMenuClient.LOGGER.warn("Download failed {}: {}", tryUrl, e.toString());
+                LavaMenuClient.LOGGER.warn("Download/verify failed {}: {}", tryUrl, e.toString());
                 Files.deleteIfExists(part);
             }
         }
@@ -395,7 +422,6 @@ public final class ModUpdateService {
         }
     }
 
-    /** Оригинальный рабочий путь (v0.1.1). */
     private ReleaseInfo fetchLatestApiHttpClient() throws Exception {
         HttpRequest req = HttpRequest.newBuilder(URI.create(API_LATEST))
                 .timeout(Duration.ofSeconds(20))
@@ -436,22 +462,104 @@ public final class ModUpdateService {
         Matcher m = MOD_VERSION.matcher(props);
         if (!m.find()) throw new IllegalStateException("нет mod.version");
         String version = normalizeVersion(m.group(1));
-        return new ReleaseInfo(version, String.format(Locale.ROOT, RAW_JAR, version));
+        String jarUrl = String.format(Locale.ROOT, RAW_JAR, version);
+        String sha = resolveSha256(version, null);
+        return new ReleaseInfo(version, jarUrl, sha);
     }
 
-    private static ReleaseInfo parseApiBody(int statusCode, String body) throws Exception {
+    private ReleaseInfo parseApiBody(int statusCode, String body) throws Exception {
         if (statusCode == 404) throw new IllegalStateException("релизов нет");
         if (statusCode == 403 || statusCode == 429) throw new IllegalStateException("лимит GitHub " + statusCode);
         if (statusCode / 100 != 2) throw new IllegalStateException("HTTP " + statusCode);
-        String tag = jsonString(body, "tag_name");
-        if (tag == null || tag.isBlank()) throw new IllegalStateException("нет tag_name");
-        String version = normalizeVersion(tag);
-        String jarUrl = findJarAssetUrl(body);
-        if (jarUrl == null) {
+        if (body == null || body.isBlank()) throw new IllegalStateException("пустой ответ API");
+
+        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        if (!root.has("tag_name") || root.get("tag_name").isJsonNull()) {
+            throw new IllegalStateException("нет tag_name");
+        }
+        String version = normalizeVersion(root.get("tag_name").getAsString());
+
+        String jarUrl = null;
+        String digestSha = null;
+        String shaAssetUrl = null;
+        if (root.has("assets") && root.get("assets").isJsonArray()) {
+            JsonArray assets = root.getAsJsonArray("assets");
+            for (JsonElement el : assets) {
+                if (!el.isJsonObject()) continue;
+                JsonObject a = el.getAsJsonObject();
+                String name = a.has("name") ? a.get("name").getAsString() : "";
+                String url = a.has("browser_download_url") ? a.get("browser_download_url").getAsString() : "";
+                String lower = name.toLowerCase(Locale.ROOT);
+                if (lower.endsWith(".jar") && lower.contains("lavamenu") && jarUrl == null) {
+                    jarUrl = url;
+                    if (a.has("digest") && !a.get("digest").isJsonNull()) {
+                        digestSha = Sha256.normalize(a.get("digest").getAsString());
+                    }
+                }
+                if ((lower.endsWith(".sha256") || lower.contains("sha256"))
+                        && lower.contains("lavamenu") && shaAssetUrl == null) {
+                    shaAssetUrl = url;
+                }
+            }
+            if (jarUrl == null) {
+                for (JsonElement el : assets) {
+                    if (!el.isJsonObject()) continue;
+                    JsonObject a = el.getAsJsonObject();
+                    String name = a.has("name") ? a.get("name").getAsString() : "";
+                    if (name.toLowerCase(Locale.ROOT).endsWith(".jar")) {
+                        jarUrl = a.get("browser_download_url").getAsString();
+                        if (a.has("digest") && !a.get("digest").isJsonNull()) {
+                            digestSha = Sha256.normalize(a.get("digest").getAsString());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        if (jarUrl == null || jarUrl.isBlank()) {
             jarUrl = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
                     + "/releases/download/v" + version + "/lavamenu-" + version + ".jar";
         }
-        return new ReleaseInfo(version, jarUrl);
+
+        String bodySha = null;
+        if (root.has("body") && !root.get("body").isJsonNull()) {
+            Matcher bm = BODY_SHA.matcher(root.get("body").getAsString());
+            if (bm.find()) bodySha = Sha256.normalize(bm.group(1));
+        }
+
+        String sha = digestSha;
+        if (sha == null || sha.length() != 64) {
+            sha = resolveSha256(version, shaAssetUrl);
+        }
+        if ((sha == null || sha.length() != 64) && bodySha != null && bodySha.length() == 64) {
+            sha = bodySha;
+        }
+        return new ReleaseInfo(version, jarUrl, sha);
+    }
+
+    /** Скачать хэш из .sha256-ассета / raw / jsDelivr. */
+    private static String resolveSha256(String version, String shaAssetUrl) {
+        List<String> urls = new ArrayList<>();
+        if (shaAssetUrl != null && !shaAssetUrl.isBlank()) urls.add(shaAssetUrl);
+        urls.add("https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO
+                + "/releases/download/v" + version + "/lavamenu-" + version + ".jar.sha256");
+        urls.add(String.format(Locale.ROOT, RAW_SHA, version));
+        urls.add(String.format(Locale.ROOT, JSDELIVR_SHA, version));
+        for (String u : urls) {
+            try {
+                String text;
+                try {
+                    text = getStringHttpClient(u);
+                } catch (Exception e) {
+                    text = getStringUrlConnection(u);
+                }
+                String n = Sha256.normalize(text);
+                if (n.length() == 64) return n;
+            } catch (Exception e) {
+                LavaMenuClient.LOGGER.debug("SHA256 fetch failed {}: {}", u, e.toString());
+            }
+        }
+        return "";
     }
 
     private static String getStringHttpClient(String url) throws Exception {
@@ -485,32 +593,6 @@ public final class ModUpdateService {
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         in.transferTo(buf);
         return buf.toString(StandardCharsets.UTF_8);
-    }
-
-    private static String findJarAssetUrl(String releaseJson) {
-        Pattern asset = Pattern.compile(
-                "\"name\"\\s*:\\s*\"([^\"]+\\.jar)\"[\\s\\S]*?\"browser_download_url\"\\s*:\\s*\"([^\"]+)\"",
-                Pattern.CASE_INSENSITIVE);
-        Matcher m = asset.matcher(releaseJson);
-        String fallback = null;
-        while (m.find()) {
-            String name = m.group(1).toLowerCase(Locale.ROOT);
-            String url = m.group(2);
-            if (name.contains("lavamenu")) return url;
-            if (fallback == null) fallback = url;
-        }
-        Pattern urlFirst = Pattern.compile(
-                "\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.jar)\"",
-                Pattern.CASE_INSENSITIVE);
-        Matcher m2 = urlFirst.matcher(releaseJson);
-        if (m2.find()) return m2.group(1);
-        return fallback;
-    }
-
-    private static String jsonString(String json, String key) {
-        Pattern p = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\"([^\"]+)\"");
-        Matcher m = p.matcher(json);
-        return m.find() ? m.group(1) : null;
     }
 
     static String normalizeVersion(String tag) {
@@ -572,5 +654,5 @@ public final class ModUpdateService {
         return false;
     }
 
-    private record ReleaseInfo(String version, String jarUrl) {}
+    private record ReleaseInfo(String version, String jarUrl, String sha256) {}
 }

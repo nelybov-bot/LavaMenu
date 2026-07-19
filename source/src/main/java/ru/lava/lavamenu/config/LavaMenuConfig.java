@@ -6,6 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.fabricmc.loader.api.FabricLoader;
 import org.lwjgl.glfw.GLFW;
+import ru.lava.lavamenu.LavaMenuClient;
 import ru.lava.lavamenu.chat.ChatNotifySound;
 
 import java.io.IOException;
@@ -71,7 +72,6 @@ public final class LavaMenuConfig {
                 }
                 radial.ensureDefaults();
             }
-            radial.setEnabled(true);
             if (root.has("homes")) {
                 JsonObject o = root.getAsJsonObject("homes");
                 if (o.has("lastUsed")) homes.lastUsed = o.get("lastUsed").getAsString();
@@ -95,7 +95,8 @@ public final class LavaMenuConfig {
                     friends.add(fe);
                 });
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            LavaMenuClient.LOGGER.warn("LavaMenuConfig load failed: {}", t.toString());
         }
     }
 
@@ -103,7 +104,9 @@ public final class LavaMenuConfig {
         Path p = configPath();
         try {
             Files.createDirectories(p.getParent());
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("LavaMenuConfig mkdir failed: {}", e.toString());
+        }
 
         JsonObject root = new JsonObject();
         root.addProperty("cooldownMs", cooldownMs);
@@ -145,7 +148,9 @@ public final class LavaMenuConfig {
 
         try (Writer w = Files.newBufferedWriter(p, StandardCharsets.UTF_8)) {
             GSON.toJson(root, w);
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            LavaMenuClient.LOGGER.warn("LavaMenuConfig save failed: {}", e.toString());
+        }
     }
 
     public static final class Keys {

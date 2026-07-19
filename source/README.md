@@ -13,6 +13,6 @@
 export JAVA_HOME="/usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
 ./gradlew build
 ```
-JAR: `build/libs/lavamenu-0.2.0.jar`
+JAR: `build/libs/lavamenu-0.2.1.jar`
 
 Конфиг: `.minecraft/config/lavamenu.json`
